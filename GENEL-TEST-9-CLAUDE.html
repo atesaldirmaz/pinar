@@ -1,0 +1,1648 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NASM CNC - Final Simülasyonu (v4.0 - Emin Değilim Modu)</title>
+    <style>
+        :root { --primary: #2c3e50; --accent: #c0392b; --success: #27ae60; --warning: #f39c12; --light: #ecf0f1; --unsure: #9b59b6; }
+        body { font-family: 'Segoe UI', sans-serif; background: #eef2f3; margin: 0; padding: 20px; display: flex; justify-content: center; min-height: 100vh; }
+        .container { background: white; width: 100%; max-width: 800px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        
+        .header { background: var(--primary); color: white; padding: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .timer { font-size: 1.4rem; font-weight: bold; font-family: monospace; background: rgba(0,0,0,0.2); padding: 5px 15px; border-radius: 6px; }
+        .mode-badge { background: var(--warning); color: #2c3e50; padding: 4px 10px; border-radius: 4px; font-size: 0.85rem; font-weight:bold; display: none; }
+
+        .content { padding: 30px; flex-grow: 1; }
+        .question-text { font-size: 1.35rem; margin-bottom: 25px; color: #2c3e50; font-weight: 600; line-height: 1.4; }
+        
+        .options { display: flex; flex-direction: column; gap: 12px; }
+        .option-btn { padding: 18px; border: 2px solid #e0e0e0; background: white; text-align: left; border-radius: 8px; cursor: pointer; transition: all 0.2s; font-size: 1.05rem; color: #444; }
+        .option-btn:hover { background: #f8f9fa; border-color: #bdc3c7; }
+        
+        .option-btn.selected { border-color: var(--primary); background: #e8f4fc; color: var(--primary); font-weight: 600; }
+        .option-btn.correct { border-color: var(--success); background: #d4edda; color: #155724; }
+        .option-btn.wrong { border-color: var(--accent); background: #f8d7da; color: #721c24; text-decoration: line-through; }
+        
+        /* Emin Değilim Checkbox Stili */
+        .unsure-container { margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee; display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+        .unsure-box { width: 20px; height: 20px; border: 2px solid #bdc3c7; border-radius: 4px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .unsure-container.active .unsure-box { background: var(--unsure); border-color: var(--unsure); }
+        .unsure-container.active .unsure-box::after { content: '✔'; color: white; font-size: 14px; }
+        .unsure-text { color: #7f8c8d; font-size: 0.95rem; font-weight: 500; }
+        .unsure-container.active .unsure-text { color: var(--unsure); }
+
+        .explanation-box { margin-top: 25px; padding: 20px; background: #fff3cd; border-left: 6px solid var(--warning); color: #856404; display: none; line-height: 1.6; border-radius: 4px; }
+        .review-reason { margin-bottom: 10px; font-weight: bold; padding: 5px 10px; border-radius: 4px; display: inline-block; font-size: 0.85rem; }
+
+        .footer { padding: 20px; border-top: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #fafafa; }
+        button.nav-btn { padding: 12px 30px; cursor: pointer; background: var(--primary); color: white; border: none; border-radius: 6px; font-size: 1rem; font-weight: 600; transition: background 0.2s; }
+        button.nav-btn:hover { background: #34495e; }
+        button.nav-btn:disabled { background: #cbd5e0; cursor: not-allowed; }
+        button.finish-btn { background: var(--accent); }
+        button.finish-btn:hover { background: #a93226; }
+        button.review-btn { background: var(--warning); color: #2c3e50; padding: 12px 25px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 15px; }
+
+        #result-screen { display: none; padding: 50px; text-align: center; }
+        .score-circle { width: 180px; height: 180px; border-radius: 50%; background: white; color: var(--primary); display: flex; justify-content: center; align-items: center; font-size: 3.5rem; font-weight: bold; margin: 0 auto 30px; border: 8px solid var(--primary); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        
+        .progress-container { height: 8px; background: #e0e0e0; width: 100%; }
+        .progress-bar { height: 100%; background: var(--success); width: 0%; transition: width 0.4s ease; }
+    </style>
+</head>
+<body>
+
+<div class="container" id="main-container">
+    <div class="progress-container"><div class="progress-bar" id="progress-bar"></div></div>
+    <div class="header">
+        <div style="display:flex; flex-direction:column;">
+            <span style="font-size:0.9rem; opacity:0.8;">NASM CNC SİMÜLASYON v4.0</span>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <span id="q-number" style="font-weight:bold;">Soru 1</span>
+                <span class="mode-badge" id="review-badge">İNCELEME MODU</span>
+            </div>
+        </div>
+        <div class="timer" id="timer">90:00</div>
+    </div>
+    
+    <div class="content">
+        <div class="question-text" id="question-text">Soru verisi yükleniyor...</div>
+        
+        <div id="review-reason-badge" style="display:none; margin-bottom:15px;"></div>
+
+        <div class="options" id="options-container"></div>
+        
+        <div class="unsure-container" id="unsure-btn" onclick="toggleUnsure()">
+            <div class="unsure-box"></div>
+            <span class="unsure-text">Bu cevaptan emin değilim (İşaretle)</span>
+        </div>
+
+        <div class="explanation-box" id="explanation-box"></div>
+    </div>
+
+    <div class="footer">
+        <button class="nav-btn" id="prev-btn" onclick="prevQuestion()">← Geri</button>
+        <button class="nav-btn finish-btn" id="finish-btn" onclick="finishExam()" style="display:none;">SINAVI BİTİR</button>
+        <button class="nav-btn" id="next-btn" onclick="nextQuestion()">İleri →</button>
+    </div>
+</div>
+
+<div class="container" id="result-screen">
+    <h2 style="color:var(--primary); margin-bottom:30px;">Sınav Sonucu</h2>
+    <div class="score-circle" id="final-score">--</div>
+    <p id="result-msg" style="font-size:1.2rem; color:#555; margin-bottom:10px;"></p>
+    <p id="unsure-count-msg" style="font-size:1rem; color:#9b59b6; margin-bottom:30px;"></p>
+    
+    <div style="display:flex; justify-content:center; gap:15px; flex-wrap:wrap;">
+        <button class="review-btn" id="start-review-btn" onclick="startReviewMode()">YANLIŞ VE ŞÜPHELİLERİ İNCELE</button>
+        <button class="nav-btn" onclick="location.reload()">YENİDEN BAŞLAT</button>
+    </div>
+</div>
+
+<script>
+    // ==============================================================
+    // VERİ ALANI - BURAYI DOLDURACAĞIZ
+    // ==============================================================
+    const examQuestions = [{
+        "id": 1,
+        "category": "Beslenme Bilimi",
+        "question": "Bir müşteri, düşük karbonhidratlı beslenme planında glukoneogenez sürecini sorguluyor. Hangi amino asit kombinasyonu bu metabolik yolda en yüksek glukoz dönüşüm potansiyeline sahiptir?",
+        "options": [
+            "Lösin, izolösin ve valin gibi dallanmış zincirli amino asitler",
+            "Alanin, glutamin ve serin gibi glukojenik amino asitler",
+            "Fenilalanin, tirozin ve triptofan gibi aromatik amino asitler",
+            "Arginin, ornitin ve sitrülin gibi üre döngüsü amino asitleri"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Alanin, glutamin ve serin glukojenik amino asitlerdir ve doğrudan piruvat veya TCA döngüsü ara ürünlerine dönüşerek glukoneogenezde kullanılırlar. Alanin özellikle kas dokusundan karaciğere glukoz-alanin döngüsüyle taşınır. BCAA'lar (A şıkkı) hem ketojenik hem glukojenik özelliklere sahiptir ancak öncelikli olarak enerji üretiminde kullanılır. Aromatik amino asitler (C şıkkı) karma metabolizmaya sahiptir. Üre döngüsü amino asitleri (D şıkkı) ise azot metabolizmasında rol oynar."
+    },
+    {
+        "id": 2,
+        "category": "Beslenme Bilimi",
+        "question": "Bir atlet yoğun direnç antrenmanı sonrası kas protein sentezini optimize etmek istiyor. mTOR sinyal yolunun aktivasyonu için hangi beslenme stratejisi en etkilidir?",
+        "options": [
+            "Yüksek glisemik indeksli karbonhidrat ve orta düzey protein kombinasyonu",
+            "Lösin açısından zengin protein kaynağı ve basit karbonhidrat kombinasyonu",
+            "Omega-3 yağ asitleri ve tam tahıl karbonhidrat kombinasyonu",
+            "Kazein proteini ve kompleks karbonhidrat ile düşük GI kombinasyonu"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Lösin, mTOR (mammalian target of rapamycin) sinyal yolunun en güçlü aktivatörüdür ve kas protein sentezini başlatır. Basit karbonhidratlar insülin salgılanmasını tetikleyerek protein sentezini destekler ve protein yıkımını azaltır. A şıkkı protein miktarını belirtmediği için yetersizdir. C şıkkı omega-3'lerin anti-inflamatuar etkisine odaklanır ancak mTOR aktivasyonunda birincil rol oynamaz. D şıkkı kazein yavaş sindirilir, akut protein sentezi için optimal değildir."
+    },
+    {
+        "id": 3,
+        "category": "Davranış Değişikliği",
+        "question": "Bir müşteri, beslenme alışkanlıklarını değiştirmek için sürekli motivasyon kaybı yaşıyor ve 'her şey veya hiçbir şey' düşünce yapısına sahip. Hangi bilişsel yeniden yapılandırma tekniği en uygun müdahaledir?",
+        "options": [
+            "Katastrofik düşünceyi tanıma ve gri alan düşüncesi geliştirme egzersizleri",
+            "Pozitif pekiştirme kullanarak sadece başarılı günlere odaklanma stratejisi",
+            "Sosyal karşılaştırma yoluyla diğer başarılı müşterilerin hikayelerini paylaşma",
+            "Kısa vadeli hedeflerden tamamen vazgeçip uzun vadeli vizyona odaklanma"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: 'Her şey veya hiçbir şey' düşüncesi (dichotomous thinking) bilişsel çarpıtmanın klasik bir örneğidir. Katastrofik düşünceyi tanıma ve gri alan düşüncesi (mükemmel ile başarısız arasındaki spektrumu görme) geliştirme, Bilişsel Davranışçı Terapi'nin (CBT) temel tekniğidir. B şıkkı gerçekçi değildir ve başarısızlıkları görmezden gelir. C şıkkı kıyaslama yaparak olumsuz duygular yaratabilir. D şıkkı küçük kazanımları önemsizleştirir ve motivasyonu azaltabilir."
+    },
+    {
+        "id": 4,
+        "category": "Beslenme Bilimi",
+        "question": "Tip 2 diyabetli bir müşteri için postprandiyal glisemik yanıtı optimize etmek amacıyla hangi besin kombinasyonu en etkili glukoz düzenlemesini sağlar?",
+        "options": [
+            "Tam tahıl ekmek ile düşük yağlı peynir ve portakal suyu",
+            "Beyaz pirinç ile kızarmış sebze ve zeytinyağı karışımı servis edilmesi",
+            "Yulaf ezmesi ile yüksek lif içeren chia tohumu ve badem kombinasyonu",
+            "Makarna ile yağsız tavuk göğsü ve domates sosu servis edilmesi"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: Yulaf ezmesi beta-glukan içeren çözünebilir lif kaynağıdır, chia tohumu ek lif ve omega-3 sağlar, badem ise sağlıklı yağ ve protein ekler. Bu kombinasyon gastrik boşalmayı yavaşlatır ve glukoz emilimini düzenler. A şıkkı portakal suyu basit şeker ekler. B şıkkı beyaz pirinç yüksek GI'ya sahiptir. D şıkkı makarna rafine karbonhidrat kaynağıdır ve yeterli lif içermez. Çözünebilir lif, protein ve sağlıklı yağ kombinasyonu en iyi glisemik kontrolü sağlar."
+    },
+    {
+        "id": 5,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir müşteri, beslenme planına uyum konusunda sürekli engellerle karşılaşıyor ancak spesifik nedenleri tanımlayamıyor. Hangi motivasyonel görüşme tekniği bu durumda en değerli通路açacaktır?",
+        "options": [
+            "Açık uçlu sorular kullanarak müşterinin kendi engel ve çözümlerini keşfetmesini sağlama",
+            "Doğrudan tavsiye vererek müşteriye en etkili çözüm yollarını sunma yaklaşımı",
+            "Müşterinin geçmiş başarısızlıklarını analiz ederek tekrar etmemesi için uyarma stratejisi",
+            "Normatif geri bildirim sağlayarak müşterinin performansını diğerleriyle karşılaştırma yöntemi"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Motivasyonel Görüşme'nin (MI) temel ilkelerinden biri özerklik desteğidir. Açık uçlu sorular (örn: 'Sizi planınızdan uzaklaştıran durumlar nelerdir?') müşterinin kendi bakış açısını keşfetmesini ve içsel motivasyon geliştirmesini sağlar. Bu yaklaşım değişim konuşmasını (change talk) teşvik eder. B şıkkı direktif yaklaşım MI'ye aykırıdır ve direnci artırabilir. C şıkkı olumsuz duygular yaratır ve savunmacılığı tetikler. D şıkkı dışsal motivasyon yaratır ve sürdürülebilir değildir."
+    },
+    {
+        "id": 6,
+        "category": "Beslenme Bilimi",
+        "question": "Yüksek yoğunluklu interval antrenman (HIIT) yapan bir sporcu, karnosinin kas içi tamponlama kapasitesini artırmak istiyor. Hangi suplementasyon stratejisi bu hedefe en uygun şekilde hizmet eder?",
+        "options": [
+            "Beta-alanin günde 4-6 gram bölünmüş dozlarda 4 hafta süreyle alınması",
+            "L-karnitin günde 2 gram tek doz antrenman öncesi tüketimi şeklinde",
+            "Kreatin monohidrat günde 5 gram sürekli yükleme protokolü ile kullanımı",
+            "L-histidin günde 3 gram günün farklı zamanlarında bölünmüş dozlarda"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Beta-alanin, kas hücrelerinde beta-alanin ve histidin birleşerek karnosin sentezini artırır. Karnosin, hidrojen iyonlarını tamponlayarak kas asidozunu geciktirir ve yüksek yoğunluklu egzersiz performansını iyileştirir. 4-6 gram/gün dozaj ve minimum 4 haftalık kullanım kas karnosin seviyelerini %60-80 artırır. B şıkkı karnitin yağ metabolizmasına katkı sağlar ancak tamponlama yapmaz. C şıkkı kreatin fosfat sistemini etkiler. D şıkkı histidin genellikle diyette yeterlidir ve direkt suplementasyon beta-alanin kadar etkili değildir."
+    },
+    {
+        "id": 7,
+        "category": "Davranış Değişikliği",
+        "question": "Bir müşteri, stres yönetimi için duygusal yeme davranışı sergiliyor ve tetikleyici durumları fark etmekte zorlanıyor. Hangi müdahale tekniği mindfulness temelli farkındalık oluşturmada en etkilidir?",
+        "options": [
+            "Yeme öncesi duygusal durum değerlendirmesi ve alternatif başa çıkma stratejileri listesi",
+            "Günlük kalori takibi ve hedef kaloriyi aşan günlerde ceza sistemi uygulaması",
+            "Tetikleyici durumları tamamen ortadan kaldırmak için ortam düzenlemesi yapma stratejisi",
+            "Düzenli öğün zamanları ve aç kalmayı önlemek için saatli yemek protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Duygusal durum değerlendirmesi (HALT protokolü: Hungry-Angry-Lonely-Tired gibi) mindfulness'ın temel unsurudur ve otomatik yeme davranışını bilinçli farkındalığa dönüştürür. Alternatif başa çıkma stratejileri (nefes egzersizleri, yürüyüş, günlük yazma) davranışsal esneklik geliştirir. B şıkkı cezalandırıcı yaklaşım olumsuz ilişki yaratır. C şıkkı gerçekçi değildir, stres hayatın doğal parçasıdır. D şıkkı fiziksel açlığı ele alır ancak duygusal yemenin psikolojik boyutunu görmezden gelir."
+    },
+    {
+        "id": 8,
+        "category": "Beslenme Bilimi",
+        "question": "Vegan beslenme modeli izleyen bir dayanıklılık atleti, demirin biyoyararlanımını maksimize etmek için hangi beslenme stratejisini öncelikle uygulamalıdır?",
+        "options": [
+            "C vitamini kaynağı besinleri demir içeren bitkisel besinlerle aynı öğünde tüketme",
+            "Kalsiyum takviyelerini demir içeren öğünlerle birlikte alarak sinerjik etki yaratma",
+            "Yüksek fitik asit içeren tahılları işlenmemiş formda tüketip sindirim süresini uzatma",
+            "Polifenol açısından zengin yeşil çay ve kahveyi demir öğünleriyle kombinasyonla alma"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: C vitamini (askorbik asit), non-hem demir emilimini önemli ölçüde artırır çünkü demiri daha absorbable olan ferröz forma (Fe2+) indirger. Bitkilerde bulunan demir non-hem formdadır ve biyoyararlanımı düşüktür. B şıkkı yanlıştır; kalsiyum demir emilimini inhibe eder. C şıkkı yanlıştır; fitik asit demir emilimini azaltır, ıslatma/çimlendirme işlemleri fitik asidi azaltır. D şıkkı yanlıştır; polifenoller (tanenler) demir ile şelat kompleksi oluşturarak emilimi engeller."
+    },
+    {
+        "id": 9,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir müşteri, beslenme koçluğu sürecinde ilerlemesini objektif olarak değerlendirmek istiyor ancak sadece tartıya odaklanmaktan kaçınmayı tercih ediyor. Hangi outcome-based ölçüm kombinasyonu en kapsamlı değerlendirmeyi sağlar?",
+        "options": [
+            "Vücut kompozisyonu analizi, performans metrikleri ve subjektif iyilik hali değerlendirmesi kombinasyonu",
+            "Günlük tartı ölçümü, kalori sayımı ve haftalık fotoğraf karşılaştırması yaklaşımı",
+            "Biyokimyasal kan testleri, genetik profilleme ve metabolik hız ölçümü kombinasyonu",
+            "Sosyal medya paylaşımları, arkadaş yorumları ve ayna değerlendirmesi subjektif analizi"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Kapsamlı outcome değerlendirmesi çoklu veri noktası gerektirir. Vücut kompozisyonu (DEXA, BIA) yağ kütlesi ve yağsız kütle değişimini gösterir. Performans metrikleri (güç, dayanıklılık, enerji seviyeleri) fonksiyonel iyileşmeyi ölçer. Subjektif iyilik hali (uyku kalitesi, ruh hali, sindirim) yaşam kalitesini değerlendirir. B şıkkı sadece ağırlık odaklıdır. C şıkkı pahalı ve gereğinden fazla teknik, genetik profilleme davranış değişimini ölçmez. D şıkkı objektif değildir ve dışsal validasyona bağımlıdır."
+    },
+    {
+        "id": 10,
+        "category": "Beslenme Bilimi",
+        "question": "Bir kadın müşteri perimenopozal dönemde kemik sağlığını optimize etmek istiyor. Kalsiyum takviyesinin yanı sıra hangi mikrobesin kombinasyonu kemik mineralizasyonunu en etkili şekilde destekler?",
+        "options": [
+            "Vitamin D3, vitamin K2 (MK-7) ve magnezyum trifonatlı kombine suplementasyon",
+            "Vitamin A, vitamin E ve selenyum antioksidan destek protokolü kombinasyonu",
+            "B-kompleks vitaminleri, çinko ve bakır oligoelement destek kombinasyon şeması",
+            "Vitamin C, mangan ve bor ile kolajen sentezi odaklı kombine destek"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Vitamin D3 kalsiyum emilimini artırır ve kemik homeostazını düzenler. Vitamin K2 (özellikle MK-7 formu) osteokalsin aktivasyonunda kritiktir ve kalsiyumun kemiklere yönlendirilmesini sağlar, vasküler kalsifikasyonu önler. Magnezyum, kemik matriksinin yapısal bileşenidir ve vitamin D metabolizması için gereklidir. Bu üçlü kombinasyon sinerjik etki gösterir. B şıkkı antioksidan odaklıdır ancak kemik mineralizasyonunda birincil rol oynamaz. C şıkkı genel sağlığı destekler ancak kemik-spesifik değildir. D şıkkı kolajen sentezini destekler ancak mineralizasyon için yetersizdir."
+    },
+    {
+        "id": 11,
+        "category": "Davranış Değişikliği",
+        "question": "Bir müşteri, yeni beslenme alışkanlıklarını sürdürmekte zorlanıyor ve eski davranış kalıplarına geri dönme eğilimi gösteriyor. Hangi davranışsal strateji habit loop modelinde en etkili müdahaledir?",
+        "options": [
+            "Tetikleyici (cue) tanımlama, rutin değişikliği ve ödül yapısını yeniden tasarlama stratejisi",
+            "Tüm eski alışkanlıkları aniden kesme ve tamamen yeni rutinler oluşturma yaklaşımı",
+            "Sosyal baskı oluşturmak için arkadaşlara hedeflerini açıklama ve accountability partneri bulma",
+            "İrade gücünü güçlendirmek için motivasyonel videolar izleme ve günlük afirmasyon tekrarı"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Charles Duhigg'in Habit Loop modeli: cue (tetikleyici) → routine (rutin) → reward (ödül) döngüsünden oluşur. Alışkanlık değişimi için en etkili strateji 'habit stacking' ve 'cue replacement'tır: mevcut tetikleyiciyi tanımla, yeni bir rutin tasarla, tatmin edici bir ödül oluştur. B şıkkı gerçekçi değildir ve geri dönüş riskini artırır. C şıkkı sosyal desteği kullanır ancak habit loop mekanizmasını ele almaz. D şıkkı motivasyonel ancak yapısal davranış değişimi sağlamaz, irade gücü sınırlı bir kaynaktır."
+    },
+    {
+        "id": 12,
+        "category": "Beslenme Bilimi",
+        "question": "Ketojenik diyet uygulayan bir müşteri, elektrolit dengesizliği ve 'keto flu' semptomları yaşıyor. Hangi elektrolit replasman stratejisi bu adaptasyon döneminde en uygun desteği sağlar?",
+        "options": [
+            "Sodyum 3-5 gram, potasyum 3-4 gram, magnezyum 400 mg günlük alım kombinasyonu",
+            "Sadece sodyum alımını artırma ve diğer elektrolitlerin doğal dengelenmesini bekleme stratejisi",
+            "Yüksek doz kalsiyum takviyesi ve düşük sodyum alımı ile mineral dengesi",
+            "Potasyum ve fosfor odaklı takviye ile sodyum kısıtlaması uygulama protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Ketojenik diyette insülin seviyeleri düşer, bu da böbreklerin sodyum tutmasını azaltır ve natriürez (sodyum kaybı) yapar. Sodyum kaybı potasyum ve magnezyum kaybını da tetikler. Keto flu semptomları (baş ağrısı, yorgunluk, kas krampları) elektrolit dengesizliğinin belirtileridir. Optimal replasman: sodyum 3-5g (bouillon, tuz), potasyum 3-4g (avokado, yeşil yapraklılar), magnezyum 400mg (takviye veya kabuklu yemişler). B şıkkı yetersizdir. C ve D şıkları sodyum kısıtlaması önerir ki bu ketojenik adaptasyonda kontraendikedir."
+    },
+    {
+        "id": 13,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir müşteri, beslenme planına uyum konusunda düşük öz-yeterlik (self-efficacy) sergilediğinde, hangi coaching yaklaşımı Bandura'nın Sosyal Bilişsel Teorisine en uygun şekilde müdahale eder?",
+        "options": [
+            "Küçük, başarılabilir hedefler belirleyip mastery experiences (ustalık deneyimleri) yaratma stratejisi uygulanması",
+            "Yüksek başarı örnekleri gösterip müşteriye mükemmel performans beklentisi oluşturma yaklaşımı",
+            "Başarısızlık durumlarını analiz ederek müşterinin zayıf noktalarına odaklanma metodu kullanımı",
+            "Doğrudan tavsiye ve direktif rehberlik ile müşterinin karar verme sorumluluğunu üstlenme"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Bandura'nın teorisine göre öz-yeterlik dört kaynaktan beslenir: 1) Mastery experiences (ustalık deneyimleri) - en güçlü kaynak, 2) Vicarious experiences (dolaylı deneyimler), 3) Sosyal ikna, 4) Fizyolojik durumlar. Küçük, başarılabilir hedefler (micro-goals) başarı deneyimi yaratır ve öz-yeterliği güçlendirir. B şıkkı gerçekçi değildir ve başarısızlık korkusu yaratabilir. C şıkkı negatif odaklıdır ve öz-yeterliği azaltır. D şıkkı müşterinin özerkliğini zedeler ve bağımlılık yaratır."
+    },
+    {
+        "id": 14,
+        "category": "Beslenme Bilimi",
+        "question": "Bir güç antrenmanı yapan sporcu, kasılan kas dokusundaki miyofibrilyar protein sentezini uzun vadede optimize etmek için hangi protein tüketim stratejisini benimsemelidir?",
+        "options": [
+            "Günde 4-5 öğünde eşit dağıtılmış, her öğünde 0.4-0.5 g/kg protein alımı",
+            "Günlük toplam protein ihtiyacını tek öğünde yüksek doz tüketim protokolü",
+            "Sadece antrenman sonrası pencerede 1 gram/kg protein alımı odaklı beslenme",
+            "Her öğünde minimum protein ve ağırlıklı karbonhidrat odaklı beslenme düzeni"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Kas protein sentezi (MPS), protein tüketiminden sonra 3-5 saat yükselir, sonra bazal seviyeye döner (muscle full effect). Günde 4-5 öğünde 0.4-0.5 g/kg (veya 20-40g) protein alımı, her öğünde MPS'yi stimüle eder ve 24 saatlik toplam sentezi optimize eder. Bu dağılım, özellikle lösin eşiği (2.5-3g/öğün) aşılarak mTOR aktivasyonunu maksimize eder. B şıkkı tek öğün yaklaşımı, oksidasyon ve üre döngüsünde kayba yol açar. C şıkkı sadece anabolic window'a odaklanır, günlük toplam sentezi optimize etmez. D şıkkı yetersiz protein sağlar."
+    },
+    {
+        "id": 15,
+        "category": "Davranış Değişikliği",
+        "question": "Bir müşteri, beslenme hedeflerine ulaşma konusunda kontrol odağı (locus of control) dışsaldır ve sürekli dış faktörleri suçlamaktadır. Hangi müdahale içsel kontrol odağı geliştirmede en etkilidir?",
+        "options": [
+            "Müşterinin kontrol edebileceği değişkenleri belirleme ve küçük kararlardan başlayarak özerklik deneyimi yaratma",
+            "Tüm dış engelleri ortadan kaldırma ve mükemmel çevre koşulları oluşturma planı yapma",
+            "Müşteriye dış faktörlerin gerçekten önemli olduğunu onaylama ve sempati gösterme yaklaşımı",
+            "Başarılı insanların hikayelerini anlatarak karşılaştırmalı motivasyon sağlama metodu kullanma"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Dışsal kontrol odağına sahip bireyler, olayların dış güçler, şans veya diğer insanlar tarafından kontrol edildiğine inanır. İçsel kontrol odağı geliştirmek için 'agency building' (faillik oluşturma) kritiktir: müşterinin kontrol edebileceği değişkenleri (öğün zamanlaması, market alışverişi, porsiyonlar) tanımlamak ve küçük kararlar aldırmak. Bu, self-determination theory'nin özerklik ihtiyacını karşılar. B şıkkı gerçekçi değildir ve dışsal bağımlılığı pekiştirir. C şıkkı dışsal odağı doğrular ve değişimi engelleyebilir. D şıkkı sosyal karşılaştırma yaratır ve olumsuz olabilir."
+    },
+    {
+        "id": 16,
+        "category": "Beslenme Bilimi",
+        "question": "Bir kadın sporcu, RED-S (Relative Energy Deficiency in Sport) riski taşıyor ve amenore yaşıyor. Hangi beslenme ve davranış değişikliği kombinasyonu hipotalamik-pituiter-gonadal aks fonksiyonunu restore etmede önceliklidir?",
+        "options": [
+            "Enerji alımını artırma, antrenman hacmini azaltma ve yeterli diyet yağ alımı sağlama",
+            "Yüksek protein, düşük yağ diyeti ve antrenman yoğunluğunu koruma stratejisi",
+            "Intermittent fasting protokolü ve metabolik esneklik geliştirme yaklaşımı uygulaması",
+            "Karbonhidrat kısıtlaması ve ketojenik adaptasyon ile hormonal düzenleme stratejisi"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: RED-S, düşük enerji mevcudiyeti (energy availability < 30 kcal/kg FFM/gün) sonucu gelişir ve hipotalamik amenoreye yol açar. Tedavinin temel direkleri: 1) Enerji alımını artırma (EA > 45 kcal/kg FFM/gün), 2) Antrenman yükünü azaltma, 3) Yeterli diyet yağı (hormonal sentez için minimum %20-30 total kalori). Özellikle kolesterol bazlı hormon (östrojen, progesteron) sentezi için yağ kritiktir. B şıkkı düşük yağ önerir, bu hormonal süprasyonu sürdürür. C ve D şıkları enerji kısıtlamasını içerir ve RED-S'i kötüleştirir."
+    },
+    {
+        "id": 17,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir müşteri, beslenme değişikliklerine direnç gösteriyor ve 'change talk' yerine 'sustain talk' sergilediğinde, hangi Motivasyonel Görüşme stratejisi ambivalansı çözmede en uygun reflektif dinleme tekniğidir?",
+        "options": [
+            "Amplified reflection kullanarak müşterinin direncini abartma ve çelişkiyi ortaya çıkarma",
+            "Direnci görmezden gelme ve sadece pozitif ifadeleri pekiştirme yaklaşımı uygulama",
+            "Confrontational feedback ile müşterinin tutarsızlıklarını doğrudan yüzüne vurma metodu",
+            "Müşterinin sustain talk'ını onaylama ve değişim hedeflerinden vazgeçme önerisi sunma"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Motivasyonel Görüşme'de ambivalans (değişim arzusu vs. mevcut durumu sürdürme arzusu) normaldir. Amplified reflection (yansıtma), müşterinin direncini hafifçe abartarak yansıtma tekniğidir (örn: 'Yani hiçbir şekilde değişmek istemiyorsunuz'). Bu teknik, müşterinin kendi argümanının diğer tarafını görmesini sağlar ve genellikle karşı argüman (change talk) üretir. 'Righting reflex'e (düzeltme refleksi) direnmek kritiktir. B şıkkı seçici pekiştirme yapar ancak ambivalansı çözmez. C şıkkı MI'ye aykırıdır ve direnci artırır. D şıkkı terapötik nihilizmdir."
+    },
+    {
+        "id": 18,
+        "category": "Beslenme Bilimi",
+        "question": "Bir dayanıklılık atleti, uzun mesafe yarışması öncesi gastrointestinal distres riskini minimize ederken karbonhidrat yüklemesi yapmak istiyor. Hangi karbonhidrat kaynak ve zamanlamastratejisi optimal glikojen depolaması sağlar?",
+        "options": [
+            "Yarıştan 36-48 saat önce orta-yüksek GI karbonhidratlar ve düşük lif alımı kombinasyonu",
+            "Yarıştan 1 hafta önce başlayan sürekli yüksek fruktoz diyeti protokolü uygulaması",
+            "Yarıştan 12 saat önce büyük tek öğün ve yüksek protein kombinasyonu",
+            "Yarıştan 72 saat önce ketojenik diyet ve son 6 saatte refeeding protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Klasik karbonhidrat yüklemesi (carb-loading): yarıştan 36-48 saat önce karbonhidrat alımını 8-12 g/kg/gün'e çıkarma, antrenman hacmini azaltma (taper). Orta-yüksek GI karbonhidratlar (beyaz pirinç, patates, beyaz ekmek) hızlı glikojen sentezi sağlar. Düşük lif alımı GI distres riskini azaltır çünkü lif bağırsak transit süresini uzatır ve fermantasyon yapar. B şıkkı yüksek fruktoz karaciğer glikojenini artırır ancak kas glikojenini optimal artırmaz. C şıkkı gastrik boşalma zamanı çok kısadır. D şıkkı gerçekçi değildir ve glikojen süper-kompanzasyonunu sağlamaz."
+    },
+    {
+        "id": 19,
+        "category": "Davranış Değişikliği",
+        "question": "Bir müşteri, beslenme hedefleri için implementation intentions (uygulama niyetleri) oluşturmak istiyor. Hangi 'if-then' planlama stratejisi davranışsal otomatiklik geliştirmede en etkili yapıdadır?",
+        "options": [
+            "Spesifik tetikleyici, açık eylem ve önceden tanımlanmış bağlam içeren yapılandırılmış plan oluşturma",
+            "Genel niyetler bildirme ve esnek yaklaşım ile spontane karar alma stratejisi",
+            "Sadece motivasyonel hedefler belirleme ve duruma göre reaktif davranma yaklaşımı",
+            "Uzun vadeli vizyoner hedefler ve geniş eylem planları ile soyut düşünme"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Implementation intentions (Gollwitzer), goal intentions'ı spesifik eyleme bağlar: 'If [SITUATION], then [BEHAVIOR]' formatı. Etkili uygulama niyeti şunları içerir: 1) Spesifik tetikleyici/cue (örn: 'sabah kalktığımda'), 2) Açık davranış (örn: '30g protein içeren kahvaltı yapacağım'), 3) Önceden tanımlanmış bağlam (yer, zaman). Bu format, bilişsel yükü azaltır ve davranışı otomatikleştirir. Araştırmalar, implementation intentions kullananların hedefe ulaşma oranının 2-3 kat arttığını gösterir. B, C ve D şıkları belirsizdir ve hedef-eylem bağlantısı kurmaz."
+    },
+    {
+        "id": 20,
+        "category": "Beslenme Bilimi",
+        "question": "Bir vegan sporcu, kreatin fosfokreatin sistemini optimize etmek için suplementasyon düşünüyor. Hangi dozaj ve yükleme stratejisi kas kreatin seviyelerini en hızlı ve etkili şekilde artırır?",
+        "options": [
+            "Yükleme fazı: 20g/gün (4x5g) 5-7 gün, ardından idame: 3-5g/gün sürekli",
+            "Düşük doz yükleme: 3g/gün sürekli kullanım ve yükleme fazı olmadan",
+            "Yüksek doz tek seferde: 25g/gün 3 gün, sonra tamamen kesme",
+            "Döngüsel protokol: 10g/gün 2 hafta, 2 hafta ara verme stratejisi"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Kreatin monohidrat, PCr sistemini destekler ve özellikle veganlarda düşük olan endojen kreatin seviyelerini artırır. Standart protokol: yükleme fazı 20g/gün (4 doza bölünmüş) 5-7 gün, kas kreatin depolarını %20-40 artırır. İdame fazı 3-5g/gün yüksek seviyeleri korur. Alternatif: düşük doz (3g/gün) 28 günde aynı etkiyi sağlar ancak daha yavaştır. Veganlarda etkisi et tüketenlerden daha belirgindir. B şıkkı etkilidir ancak daha yavaştır. C şıkkı sürdürülebilir değildir. D şıkkı gereksiz döngüsellik yapar, kreatin güvenli uzun vadeli kullanım için uygundur."
+    },
+    {
+        "id": 21,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir müşteri, beslenme davranış değişikliği sürecinde relapse (geri dönüş) yaşadığında, hangi müdahale Prochaska ve DiClemente'nin Transteoretik Modelinde en uygun stage-matched stratejisi oluşturur?",
+        "options": [
+            "Geri dönüşü öğrenme fırsatı olarak yeniden çerçeveleme ve öz-şefkat geliştirme yaklaşımı",
+            "Müşteriyi başarısızlık nedeniyle eleştirme ve daha sıkı kural koyma stratejisi",
+            "Tüm ilerlemeyi görmezden gelme ve sıfırdan başlatma yaklaşımı uygulama metodu",
+            "Relapse durumunda koçluk ilişkisini sonlandırma ve müşteriyi yönlendirme prosedürü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Transteoretik Model'de relapse, doğrusal olmayan değişim sürecinin normal bir parçasıdır. Etkili müdahale: 1) Yeniden çerçeveleme (reframing) - geri dönüşü başarısızlık değil öğrenme fırsatı olarak görme, 2) Öz-şefkat (self-compassion) geliştirme - olumsuz içsel konuşmayı azaltma, 3) Lapse vs. relapse ayrımı yapma - tek olay sürekli patterna dönüşmemeli. Bu yaklaşım müşteriyi 'maintenance' veya 'action' stage'inde tutar. B şıkkı suçlama yapar ve motivasyonu yok eder. C şıkkı ilerlemeyi görmezden gelir. D şıkkı terapötik ilişkiyi koparır."
+    },
+    {
+        "id": 22,
+        "category": "Beslenme Bilimi",
+        "question": "Bir müşteri, bağırsak mikrobiyotasını optimize etmek ve disbiyozis riskini azaltmak için prebiyotik ve probiyotik alımını artırmak istiyor. Hangi kombinasyon sinbiyotik etki yaratmada en etkilidir?",
+        "options": [
+            "Lactobacillus ve Bifidobacterium suşları ile inulin ve dirençli nişasta kombinasyonu",
+            "Sadece yüksek doz probiyotik suplementasyonu ve düşük lif alımı stratejisi",
+            "Antibiyotik tedavisi sonrası prebiyotik kullanmadan probiyotik replasman yaklaşımı",
+            "Yüksek basit şeker diyeti ile probiyotik takviye kombine protokol uygulaması"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Sinbiyotik etki, probiyotikler (canlı mikroorganizmalar) ve prebiyotiklerin (fermente edilebilir lifler) birlikte kullanılmasıdır. Lactobacillus ve Bifidobacterium, en iyi araştırılmış probiyotik suşlardır ve immün fonksiyon, bağırsak bariyer integritesi ve metabolik sağlığı destekler. İnulin (çikoryadan) ve dirençli nişasta (soğutulmuş patates, yeşil muz) bu bakterilerin substratlarıdır ve kolonizasyonu destekler, kısa zincirli yağ asit (SCFA) üretimini artırır. B şıkkı prebiyotik eksikliğinden probiyotik kolonizasyonu zayıftır. C şıkkı prebiyotik olmadan etkisizdir. D şıkkı basit şeker disbiyozise katkıda bulunur."
+    },
+    {
+        "id": 23,
+        "category": "Davranış Değişikliği",
+        "question": "Bir müşteri, beslenme planına uyum için sosyal destek arayışında ancak çevresindeki kişiler destekleyici değil. Hangi strateji sosyal çevre optimizasyonunda en yapıcı yaklaşımdır?",
+        "options": [
+            "Online topluluk ve accountability partner bulma, sınırlar koyma becerileri geliştirme stratejisi",
+            "Tüm sosyal ilişkilerden izole olma ve sadece beslenme hedeflerine odaklanma",
+            "Çevresindekileri değiştirmeye çalışma ve onları ikna etme kampanyası yürütme yaklaşımı",
+            "Sosyal desteğin gereksiz olduğunu kabul etme ve tamamen bireysel motivasyona güvenme"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Sosyal Destek Teorisi, davranış değişikliğinde bilgilendirici, duygusal, araçsal ve değerlendirici destek türlerini tanımlar. Mevcut çevre destekleyici değilse: 1) Online topluluklar (forumlar, sosyal medya grupları) benzer hedeflere sahip kişilerle bağlantı sağlar, 2) Accountability partner yapılandırılmış destek sunar, 3) Assertive communication ile sınırlar koyma, olumsuz etkileri azaltır. B şıkkı izolasyon yaratır ve mental sağlığa zarar verebilir. C şıkkı gerçekçi değildir ve ilişki çatışması yaratabilir. D şıkkı araştırma bulgularıyla çelişir; sosyal destek davranış değişikliğinde önemli prediktördür."
+    },
+    {
+        "id": 24,
+        "category": "Beslenme Bilimi",
+        "question": "Bir sporcu, anaerobik performansı optimize etmek için sodyum bikarbonat yüklemesi düşünüyor. Hangi dozaj, zamanlama ve protokol laktik asit tamponlama kapasitesini en etkili şekilde artırır?",
+        "options": [
+            "0.3 g/kg vücut ağırlığı, egzersizden 60-90 dakika önce, yemekle birlikte alım",
+            "1.0 g/kg vücut ağırlığı, egzersizden 15 dakika önce, aç karnına alım",
+            "0.1 g/kg vücut ağırlığı, egzersiz sırasında sürekli alım protokolü uygulaması",
+            "0.5 g/kg vücut ağırlığı, egzersizden 4 saat önce, yüksek yağlı öğünle"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Sodyum bikarbonat (NaHCO3), ekstrasellüler bikarbonat tampon kapasitesini artırarak hidrojen iyon (H+) birikimini geciktirir ve yüksek yoğunluklu egzersiz (1-10 dakika) performansını iyileştirir. Optimal protokol: 0.3 g/kg (örn: 70kg kişi için ~21g), egzersizden 60-90 dakika önce, yemekle birlikte. Yemekle alım gastrik yan etkileri (bulantı, karın ağrısı) azaltır. Plazma bikarbonat pik konsantrasyonu 60-90 dakikada ulaşılır. B şıkkı doz çok yüksek ve zamanlama kötü, GI distres yapar. C şıkkı doz yetersiz. D şıkkı zamanlama suboptimal."
+    },
+    {
+        "id": 25,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir müşteri, beslenme davranışlarında bilişsel çarpıtmalar sergiliyor ve 'emotional reasoning' kullanarak kararlar alıyor. Hangi Bilişsel Davranışçı Terapi tekniği bu çarpıtmayı düzeltmede en uygun müdahaledir?",
+        "options": [
+            "Düşünce kayıtları (thought records) kullanarak duygu-düşünce-davranış bağlantısını inceleme yaklaşımı",
+            "Duygusal kararların her zaman doğru olduğunu pekiştirme ve sezgisel düşünmeyi teşvik etme",
+            "Tüm duygusal deneyimleri bastırma ve sadece rasyonel düşünceye odaklanma stratejisi",
+            "Müşterinin duygularını görmezden gelme ve sadece davranışsal değişikliklere odaklanma metodu"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Emotional reasoning bilişsel çarpıtmasında, kişi duygularını kanıt olarak kullanır ('Kendimi şişman hissediyorum, bu yüzden şişmanım'). CBT'nin düşünce kayıtları (thought records) tekniği: 1) Durumu tanımlama, 2) Otomatik düşünceleri belirleme, 3) Duyguları ve yoğunluklarını kaydetme, 4) Kanıtları inceleme, 5) Alternatif düşünceler geliştirme, 6) Sonuç değerlendirme adımlarını içerir. Bu teknik, duygu-düşünce-davranış üçgenini netleştirir ve bilişsel yeniden yapılandırma sağlar. B şıkkı çarpıtmayı pekiştirir. C şıkkı duygusal suppression yapar, sağlıksızdır. D şıkkı bütünsel yaklaşımı görmezden gelir."
+    },
+    {
+        "id": 26,
+        "category": "Beslenme Bilimi",
+        "question": "Bir tip 1 diyabetli sporcu, egzersiz sırasında hipoglisemi riskini minimize ederken performansı korumak istiyor. Hangi karbonhidrat yönetim stratejisi en güvenli ve etkili yaklaşımı temsil eder?",
+        "options": [
+            "Egzersiz yoğunluğuna göre insülin dozunu azaltma ve karbonhidrat alımını artırma kombinasyonu",
+            "Egzersiz öncesi insülin dozunu normal tutma ve hiç karbonhidrat almama stratejisi",
+            "Yüksek doz hızlı etkili insülin ve egzersiz sonrası yüksek glisemik karbonhidrat yüklemesi",
+            "Egzersiz sırasında sadece protein tüketimi ve insülin dozunu artırma protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Tip 1 diyabette egzersiz, insülin-bağımsız glukoz uptake'ini artırır ve hipoglisemi riski yüksektir. Yönetim stratejisi: 1) Bazal/bolus insülin dozunu %20-50 azaltma (egzersiz yoğunluğu ve süresine göre), 2) Egzersiz öncesi/sırası karbonhidrat alımı (orta yoğunlukta 15-30g/saat, yüksek yoğunlukta 30-60g/saat), 3) Sürekli glukoz monitörizasyonu (CGM). Bu kombinasyon, hem hipoglisemiyi önler hem de performansı destekler. B şıkkı hipoglisemi riski çok yüksektir. C şıkkı hiperglisemi yaratır. D şıkkı protein glukoz sağlamaz ve insülin artışı kontraendikedir."
+    },
+    {
+        "id": 27,
+        "category": "Davranış Değişikliği",
+        "question": "Bir müşteri, perfeksiyonist eğilimleri nedeniyle beslenme planından küçük sapmalar yaşadığında tamamen vazgeçme eğilimi gösteriyor. Hangi psikolojik müdahale 'progress not perfection' zihniyetini geliştirmede en etkilidir?",
+        "options": [
+            "Esnek kısıtlama (flexible restraint) stratejisi ve self-compassion egzersizleri kombinasyonu uygulaması",
+            "Katı kurallara daha sıkı bağlılık ve sıfır tolerans politikası ile disiplin geliştirme",
+            "Tüm planlamadan vazgeçme ve sezgisel yeme yaklaşımına tam geçiş stratejisi",
+            "Perfeksiyonizmin değerli bir özellik olduğunu pekiştirme ve koruma yaklaşımı"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Perfeksiyonizm, 'all-or-nothing' düşüncesiyle ilişkilidir ve yeme bozuklukları riskini artırır. Etkili müdahale: 1) Esnek kısıtlama (flexible restraint vs. rigid restraint) - beslenme hedeflerine esneklikle yaklaşma, 80/20 kuralı, 2) Self-compassion (Kristin Neff) - öz-eleştiri yerine öz-şefkat, küçük hatalar karşısında kendine nazik davranma. Araştırmalar, esnek kısıtlamanın sürdürülebilir davranış değişikliği ve düşük binge eating riski ile ilişkili olduğunu gösterir. B şıkkı katı kurallar perfeksiyonizmi pekiştirir. C şıkkı yapısal desteği kaldırır. D şıkkı maladaptif eğilimi normalleştirir."
+    },
+    {
+        "id": 28,
+        "category": "Beslenme Bilimi",
+        "question": "Bir yaşlı müşteri, sarkopeni önlemeye yönelik beslenme stratejisi arıyor ve anabolik direnç (anabolic resistance) durumu mevcut. Hangi protein alım stratejisi kas protein sentezini yaşla ilgili direnci aşarak optimize eder?",
+        "options": [
+            "Yüksek kaliteli protein kaynağı ile öğün başına 40 gram protein alımı stratejisi",
+            "Düşük doz protein alımı ve yüksek karbonhidrat odaklı beslenme yaklaşımı",
+            "Sadece bitkisel protein kaynaklarıyla günde 3 öğün beslenme protokolü",
+            "Protein takviyesi olmadan sadece tam gıdalarla minimal protein alımı"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Yaşlanmayla birlikte anabolik direnç gelişir - kas protein sentezi (MPS) aynı protein dozuna genç bireylere göre daha az yanıt verir. Yaşlılarda optimal MPS için: 1) Yüksek protein dozu (35-40g/öğün vs. 20-25g gençlerde), 2) Yüksek kaliteli protein (yüksek lösin içeriği, DIAAS >1.0), 3) Günde 3-4 öğüne dağıtım. Bu strateji, mTOR aktivasyonu için gerekli lösin eşiğini (2.5-3g) aşar ve anabolik direnci kırar. B şıkkı protein yetersizdir. C şıkkı bitkisel protein DIAAS düşüktür ve lösin içeriği azdir. D şıkkı sarkopeniye yol açar."
+    },
+    {
+        "id": 29,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir müşteri, beslenme davranışlarını değiştirmede intrinsik (içsel) motivasyon yerine extrinsic (dışsal) motivasyona sahip ve bu durum sürdürülebilirliği tehdit ediyor. Hangi Self-Determination Theory müdahalesi internalizasyonu destekler?",
+        "options": [
+            "Özerklik, yeterlik ve ilişkisellik ihtiyaçlarını karşılayan çevre oluşturma ve kişisel değerleri keşfetme",
+            "Dışsal ödülleri artırma ve performansa dayalı teşvik sistemi kurma stratejisi",
+            "Sosyal karşılaştırma yaparak rekabetçi motivasyon yaratma ve sıralama sistemleri kullanma",
+            "Müşterinin tüm kararlarını yönlendirme ve sıkı kontrol uygulama yaklaşımı"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Self-Determination Theory (Deci & Ryan), motivasyon internalizasyonunu açıklar. Dışsal motivasyondan içsel motivasyona geçiş için üç temel psikolojik ihtiyacı karşılamak gerekir: 1) Özerklik (autonomy) - seçim özgürlüğü ve self-authorship, 2) Yeterlik (competence) - ustalık deneyimleri ve self-efficacy, 3) İlişkisellik (relatedness) - sosyal bağlantı ve aidiyet. Kişisel değerleri keşfetme (values clarification), davranışı kişinin kimliğiyle bütünleştirir. B şıkkı dışsal motivasyonu pekiştirir. C şıkkı kontrollü motivasyon yaratır. D şıkkı özerkliği engelleyerek amotivasyona yol açabilir."
+    },
+    {
+        "id": 30,
+        "category": "Beslenme Bilimi",
+        "question": "Bir sporcu, yüksek rakımda (>2500m) antrenman yapacak ve akut dağ hastalığı riskini azaltmak istiyor. Hangi beslenme ve hidrasyon stratejisi hipobarik hipoksi adaptasyonunu en iyi destekler?",
+        "options": [
+            "Yüksek karbonhidrat alımı, bol sıvı tüketimi ve demir desteği ile eritropoez optimizasyonu",
+            "Ketojenik diyet ve düşük sıvı alımı ile metabolik adaptasyon stratejisi",
+            "Yüksek protein, düşük karbonhidrat ve sodyum kısıtlaması ile beslenme yaklaşımı",
+            "Aşırı kafein kullanımı ve minimal kalori alımı ile ağırlık azaltma protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Yüksek rakımda hipoksi adaptasyonu: 1) Yüksek karbonhidrat (>60% kalori) - oksijen verimliliği açısından yağdan daha ekonomik, solunum kotiyenti (RQ) optimize edilir, 2) Hidrasyon - yüksek rakımda insensible water loss artar, hipovolemi akut dağ hastalığı (AMS) riskini artırır, 3) Demir desteği - eritropoetin (EPO) artar ve eritropoez hızlanır, demir gereksinimi yükselir. Hemoglobin sentezi için demir kritiktir. B şıkkı ketojenik diyet yağ oksidasyonu artırır, oksijen ekonomisi kötüleşir. C şıkkı karbonhidrat yetersizdir. D şıkkı kafein dehidrasyon yapar, düşük kalori performansı bozar."
+    },
+    {
+        "id": 31,
+        "category": "Davranış Değişikliği",
+        "question": "Bir müşteri, beslenme alışkanlıklarını değiştirmede yüksek self-monitoring (öz-izleme) düzeyine sahip ancak bu durum obsesif hale gelmeye başladı. Hangi müdahale sağlıklı izleme ile obsesyon arasındaki dengeyi korumada en uygunudur?",
+        "options": [
+            "İzleme sıklığını azaltma, subjektif iyilik haline odaklanma ve esnek yaklaşım geliştirme stratejisi",
+            "İzleme davranışını artırma ve daha detaylı veri toplama ile kontrol hissi yaratma",
+            "Tüm izleme davranışlarını aniden durdurma ve tamamen sezgisel yaklaşıma geçiş yapma",
+            "Obsesif izlemeyi olumlu bir özellik olarak normalleştirme ve devam ettirme yaklaşımı"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Self-monitoring (gıda günlüğü, tartılma) davranış değişikliğinde etkilidir ancak aşırısı ortoreksiya nervoza veya yeme bozukluğu riskini artırabilir. Sağlıklı denge: 1) İzleme sıklığını gradual azaltma (günlük → haftalık → aylık), 2) Sübjektif indikatörlere odaklanma (enerji seviyeleri, uyku kalitesi, performans), 3) Esnek bilişsel çerçeve - sayılar sadece bir veri noktasıdır, kimlik veya değer göstergesi değildir. B şıkkı obsesyonu pekiştirir ve anksiyeteyi artırır. C şıkkı ani değişiklik geri dönüş riski yaratır. D şıkkı maladaptif davranışı normalleştirir."
+    },
+    {
+        "id": 32,
+        "category": "Beslenme Bilimi",
+        "question": "Bir kadın sporcu, Fonksiyonel Hipotalamik Amenore (FHA) durumundan iyileşmek için kisspeptin nöronlarının fonksiyonunu restore etmeyi hedefliyor. Hangi beslenme ve yaşam tarzı müdahalesi HPO aksını yeniden başlatmada en kritiktir?",
+        "options": [
+            "Enerji mevcudiyetini artırma, vücut yağ yüzdesini optimize etme ve leptin düzeylerini yükseltme stratejisi",
+            "Düşük kalorili diyet sürdürme ve yüksek antrenman hacmi ile hormonal adaptasyon",
+            "Intermittent fasting ve ketojenik diyet ile metabolik esneklik geliştirme yaklaşımı",
+            "Yüksek protein, düşük yağ diyeti ve maksimum egzersiz yoğunluğu protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: FHA, enerji yetersizliği nedeniyle hipotalamik GnRH (gonadotropin-releasing hormone) pulsatilitesinin baskılanmasıdır. Kisspeptin nöronları GnRH salgılanmasını kontrol eder ve enerji durumuna (leptin, insülin, ghrelin) duyarlıdır. Tedavi: 1) Enerji mevcudiyetini artırma (>45 kcal/kg FFM/gün), 2) Vücut yağ yüzdesini optimize etme (minimum ~22% kadınlarda), 3) Leptin düzeylerini yükseltme (leptin, kisspeptin nöronlarını aktive eder). B, C ve D şıkları enerji kısıtlamasını sürdürür ve HPO aks süprasyonunu devam ettirir. Menstrüel siklusun geri dönmesi için pozitif enerji dengesi şarttır."
+    },
+    {
+        "id": 33,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir müşteri, beslenme hedeflerinde plato yaşadığında motivasyon kaybediyor ve vazgeçme eğilimi gösteriyor. Hangi coaching stratejisi non-linear progress (doğrusal olmayan ilerleme) beklentisi oluşturmada en yapıcıdır?",
+        "options": [
+            "İlerlemeyi yeniden tanımlama, non-scale victories'e odaklanma ve büyüme zihniyeti geliştirme yaklaşımı",
+            "Sadece tartı sonuçlarına odaklanma ve plato durumunda daha agresif kalori kısıtlaması uygulama",
+            "Plato dönemlerinde müşteriyi hayal kırıklığına uğradığı için eleştirme ve baskı uygulama",
+            "Tüm hedeflerden vazgeçme ve mevcut durumla yetinme önerisi sunma stratejisi"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Plato dönemleri (adaptif termogenez, metabolik adaptasyon, hormon değişiklikleri) doğaldır. Etkili coaching: 1) İlerlemeyi yeniden tanımlama - sadece tartı değil, vücut kompozisyonu, performans, sağlık belirteçleri, uyku kalitesi, 2) Non-scale victories (NSV) - kıyafet uyumu, enerji seviyeleri, kan değerleri, 3) Büyüme zihniyeti (growth mindset, Carol Dweck) - plato öğrenme fırsatı ve adaptasyon işaretidir. Bu yaklaşım, external outcome'dan process orientation'a geçişi sağlar. B şıkkı metabolik stres yaratır. C şıkkı motivasyonu yok eder. D şıkkı terapötik nihilizmdir."
+    },
+    {
+        "id": 34,
+        "category": "Beslenme Bilimi",
+        "question": "Bir sporcu, gece antrenmanı sonrası kas recovery'sini optimize etmek ve gece boyunca muscle protein breakdown'ı minimize etmek istiyor. Hangi yatmadan önce beslenme stratejisi en etkili miyofibrilyar protein sentezini sağlar?",
+        "options": [
+            "Yavaş sindirilen kazein proteini 40 gram dozajında yatmadan 30 dakika önce",
+            "Hızlı sindirilen whey proteini 20 gram dozajında yatmadan 2 saat önce",
+            "Sadece karbonhidrat içeren besin alımı ve protein almama stratejisi uygulaması",
+            "Yüksek yağlı besinler ve minimal protein alımı kombinasyonu protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Gece boyunca (post-absorptive state) kas protein yıkımı devam eder. Pre-sleep protein feeding stratejisi: 1) Kazein proteini - yavaş sindirim (6-8 saat), sürekli aminoasit salınımı sağlar, 2) 40g dozaj - gençlerde 20g, yaşlılarda ve atletlerde 40g optimal MPS stimulasyonu sağlar, 3) Yatmadan 30-60 dakika önce alım - gastrik boşalma ve uyku kalitesini etkilemez. Araştırmalar, pre-sleep kazein alımının gece boyunca MPS'yi artırdığını ve net protein dengesini iyileştirdiğini gösterir. B şıkkı whey hızlı sindirilirlir, gece boyunca etki sürdürmez. C ve D şıkları protein yetersizdir."
+    },
+    {
+        "id": 35,
+        "category": "Davranış Değişikliği",
+        "question": "Bir müşteri, beslenme davranış değişikliğinde yüksek eğort (çaba) harcıyor ancak düşük sonuç alıyor ve learned helplessness (öğrenilmiş çaresizlik) geliştirme riski taşıyor. Hangi psikolojik müdahale self-efficacy'yi restore etmede önceliklidir?",
+        "options": [
+            "Küçük, kontrol edilebilir değişkenler belirleme ve immediate success experiences (anında başarı deneyimleri) yaratma",
+            "Daha büyük hedefler koyma ve müşteriyi daha fazla çabayla zorlama stratejisi",
+            "Müşteriye başarısızlığın kendi sorumluluğu olduğunu vurgulama ve eleştirme yaklaşımı",
+            "Tüm kontrol hissini koçun alması ve müşteriyi pasif alıcı pozisyonuna koyma"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Learned helplessness (Martin Seligman), tekrarlayan başarısızlık sonucu kontrolün olmadığına inanma durumudur. Self-efficacy restore etmek için: 1) Küçük, kontrol edilebilir değişkenler (mikro-davranışlar) - örn: 'her gün 2 porsiyon sebze', 'su şişesi yanımda taşıma', 2) Immediate success experiences - hızlı kazanımlar, pozitif geri bildirim döngüsü, 3) Attribution retraining - başarısızlıkları dış faktörlere, başarıları içsel faktörlere atfetme. Bu yaklaşım, 'contingency awareness' (davranış-sonuç bağlantısı) geliştirir. B şıkkı başarısızlık riskini artırır. C şıkkı internal, stable, global attribution yapar ve çaresizliği derinleştirir. D şıkkı özerkliği yok eder."
+    },
+    {
+        "id": 36,
+        "category": "Beslenme Bilimi",
+        "question": "Bir müşteri, gut-brain axis (bağırsak-beyin ekseni) optimizasyonu yoluyla ruh hali ve bilişsel fonksiyonlarını iyileştirmek istiyor. Hangi beslenme stratejisi nörotransmitter prekürsör ve mikrobiyota-nörotransmitter üretimini en etkili destekler?",
+        "options": [
+            "Triptofan, tirozin içeren besinler, fermente gıdalar ve prebiyotik lif kombinasyonu stratejisi",
+            "Yüksek basit şeker, düşük lif ve minimal fermente gıda alımı yaklaşımı",
+            "Sadece protein içeren besinler ve tüm karbonhidratlardan kaçınma protokolü uygulaması",
+            "Yüksek doymuş yağ, düşük çeşitlilik ve minimal bitki bazlı besin alımı"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Gut-brain axis, bağırsak mikrobiyotası ve beyin arasındaki iki yönlü iletişimdir (vagus siniri, immün mediatörler, nörotransmitterler). Optimizasyon: 1) Triptofan (serotonin prekürsörü) - hindi, tofu, avokado; tirozin (dopamin/norepinefrin prekürsörü) - badem, avokado, muz, 2) Fermente gıdalar (kefir, kimchi, sauerkraut) - probiyotikler GABA, serotonin, dopamin üretir, 3) Prebiyotik lif - SCFA üretimi, bağırsak bariyer integritesi. Mikrobiyota, nörotransmitterlerin %90-95'ini üretir. B şıkkı disbiyozis yaratır. C şıkkı karbonhidrat (triptofan transport için gerekli) eksiktir. D şıkkı mikrobiyota çeşitliliğini azaltır."
+    },
+    {
+        "id": 37,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir müşteri, beslenme davranışlarında çevresel cue-triggered eating (tetikleyici kaynaklı yeme) yaşıyor ve stimulus control stratejileri geliştirmek istiyor. Hangi behavior modification tekniği en etkili tetikleyici yönetimini sağlar?",
+        "options": [
+            "Environmental restructuring, if-then plans ve competing response training kombinasyonu uygulama stratejisi",
+            "Tüm tetikleyici besinleri evden tamamen uzaklaştırma ve sıfır erişim politikası",
+            "İrade gücünü güçlendirme ve tetikleyicilere maruz kalma terapisi ile desensitizasyon uygulaması",
+            "Tetikleyicileri görmezden gelme ve dikkat dağıtma teknikleri ile baş etme yaklaşımı"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Cue-triggered eating (stimulus-response habit), çevresel ipuçlarının (görmek, koklamak, konum) otomatik yeme davranışını tetiklemesidir. Etkili müdahale: 1) Environmental restructuring - tetikleyicileri değiştirme/kaldırma (sağlıklı besinleri göz seviyesinde, sağlıksız besinleri gizli yerlerde), 2) If-then plans - alternatif yanıt planı ('mutfağa girersem, su içeceğim'), 3) Competing response training - tetikleyici karşısında uyumsuz davranış (ellerle meşgul olma). B şıkkı gerçekçi değildir, sosyal durumlarda işlemez. C şıkkı irade gücü sınırlıdır ve yorgunluk (ego depletion) yaratır. D şıkkı uzun vadede etkisizdir."
+    },
+    {
+        "id": 38,
+        "category": "Beslenme Bilimi",
+        "question": "Bir sporcu, kan akışı kısıtlamalı antrenman (BFR - Blood Flow Restriction) sırasında kas protein sentezini optimize etmek için beslenme stratejisi arıyor. Hangi periworkout beslenme yaklaşımı düşük yük BFR'nin anabolik yanıtını maksimize eder?",
+        "options": [
+            "Antrenman öncesi 20 gram whey protein ve antrenman sonrası 40 gram protein kombinasyonu",
+            "Antrenman öncesi ve sonrası sadece karbonhidrat alımı ve protein almama stratejisi",
+            "Sadece antrenman sonrası minimal protein (5 gram) alımı ve yüksek yağ kombinasyonu",
+            "Antrenman öncesi yüksek kafein ve antrenman sonrası protein vermeme protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: BFR antrenmanı (düşük yük ~20-30% 1RM), venöz dönüşü kısıtlayarak metabolik stres yaratır ve kas protein sentezini yüksek yük antrenmanına benzer şekilde stimüle eder. Optimal beslenme: 1) Pre-workout protein (20g) - aminoasit mevcudiyeti sağlar, MPS için substrat hazırlar, 2) Post-workout protein (40g) - yüksek doz BFR sonrası artmış anabolik sinyalizasyonu destekler. BFR, mTOR ve MAPK yolaklarını aktive eder. Pre-workout protein, muscle full effect'i geciktirir. B şıkkı protein eksikliği anabolizmayı sınırlar. C şıkkı protein yetersizdir. D şıkkı kafein dehidrasyon riski yaratır ve post-workout protein eksiktir."
+    },
+    {
+        "id": 39,
+        "category": "Davranış Değişikliği",
+        "question": "Bir müşteri, beslenme davranış değişikliğinde temporal discounting (zamansal değer düşürme) eğilimi göstererek uzak gelecekteki faydaları hafife alıyor ve anlık tatmini tercih ediyor. Hangi müdahale future self-continuity artırmada en etkilidir?",
+        "options": [
+            "Mental contrasting (zihinsel karşılaştırma) ve episodic future thinking (epizodik gelecek düşüncesi) egzersizleri kombinasyonu",
+            "Sadece kısa vadeli hedeflere odaklanma ve uzun vadeli hedefleri tamamen ortadan kaldırma",
+            "Anlık ödülleri artırma ve ertelenen tatmini daha da uzağa itme stratejisi",
+            "Müşteriye gelecek endişesi verme ve korku temelli motivasyon yaratma yaklaşımı"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Temporal discounting, uzak gelecekteki ödüllerin psikolojik değerinin azalmasıdır. Future self-continuity (gelecek benlik sürekliliği) artırmak için: 1) Mental contrasting (Gabriele Oettingen) - istenen gelecek (ideal benlik) ve mevcut engelleri zihinde karşılaştırma, WOOP tekniği (Wish-Outcome-Obstacle-Plan), 2) Episodic future thinking (Daniel Schacter) - gelecek benliği vivid, detaylı, birinci şahıs perspektiften hayal etme, gelecek benlikle bağ kurma. Bu teknikler, prefrontal korteks aktivitesini artırır ve impulsif kararları azaltır. B şıkkı uzun vadeli hedefleri ihmal eder. C şıkkı temporal discounting'i pekiştirir. D şıkkı korku motivasyonu kısa vadelidir ve kaçınma davranışı yaratır."
+    },
+    {
+        "id": 40,
+        "category": "Beslenme Bilimi",
+        "question": "Bir kadın müşteri, PCOS (Polikistik Over Sendromu) ile ilişkili insülin direncini iyileştirmek için beslenme stratejisi arıyor. Hangi makrobesin dağılımı ve yemek zamanlaması hiperandrojenizm ve metabolik disfonksiyonu en etkili şekilde düzenler?",
+        "options": [
+            "Düşük glisemik indeks karbonhidratlar, yüksek lif, kahvaltıda kalori yükleme protokolü kombinasyonu",
+            "Yüksek basit şeker, düşük lif ve eşit kalori dağılımı olan beslenme",
+            "Ketojenik diyet ve intermittent fasting ile sürekli düşük insülin durumu yaratma",
+            "Yüksek doymuş yağ, düşük protein ve gece kalori yükleme stratejisi"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: PCOS'ta insülin direnci, kompensatuar hiperinsulinemi ve androjen üretimini artırır. Optimal beslenme: 1) Düşük GI karbonhidratlar ve yüksek lif - postprandiyal glukoz ve insülin yanıtını düzenler, 2) Kahvaltıda kalori yükleme (circadian rhythm optimization) - sabah insülin sensitivitesi en yüksektir, araştırmalar kahvaltıda yüksek kalori alan PCOS'lu kadınlarda iyileşmiş glukoz metabolizması ve ovülasyon gösterir, 3) Anti-inflamatuar besinler (omega-3, polifenoller). C şıkkı ketojenik diyet bazı kadınlarda etkili olabilir ancak kahvaltı kalori yükleme daha iyi kanıta sahiptir. B ve D şıkları metabolik disfonksiyonu kötüleştirir."
+    },
+    {
+        "id": 41,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir müşteri, beslenme koçluğu sürecinde coach-client ilişkisinde terapötik alliance (terapötik ittifak) güçlendirmek istiyor. Hangi coaching davranışı en güçlü working alliance oluşturmada kritik faktördür?",
+        "options": [
+            "Empati, aktif dinleme, işbirlikçi hedef belirleme ve müşterinin özerkliğine saygı gösterme kombinasyonu",
+            "Direktif yaklaşım, koçun uzmanlığını vurgulama ve müşteriyi pasif alıcı pozisyonuna koyma",
+            "Profesyonel mesafe koruma, duygusal bağlantıdan kaçınma ve sadece teknik bilgi verme",
+            "Müşterinin her istediğini onaylama ve sınır koymama, tamamen uyumlu olma stratejisi"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Terapötik alliance (Bordin), üç bileşenden oluşur: 1) Bond (bağ) - empatik, güvenli, sıcak ilişki; aktif dinleme ve validasyon, 2) Goals (hedefler) - işbirlikçi, müşterinin değerleriyle uyumlu hedef belirleme, 3) Tasks (görevler) - müşterinin özerkliğine saygı, paylaşılan sorumluluk. Strong alliance, davranış değişikliği outcome'larının en güçlü prediktörüdür. MI prensipleri (partnership, acceptance, compassion, evocation) alliance oluşturur. B şıkkı direktiftir, özerkliği zedeler. C şıkkı soğuk, bağ oluşturmaz. D şıkkı profesyonel sınırları ihlal eder, etkili değildir."
+    },
+    {
+        "id": 42,
+        "category": "Beslenme Bilimi",
+        "question": "Bir ülseratif kolit hastası remisyon döneminde bağırsak sağlığını korumak ve relaps riskini azaltmak için beslenme stratejisi arıyor. Hangi diyet kompozisyonu anti-inflamatuar etki ve bağırsak barrier integritesini en iyi destekler?",
+        "options": [
+            "Omega-3 yağ asitleri, çözünebilir lif, glutamin ve fermente gıdalar içeren çeşitli beslenme kombinasyonu",
+            "Yüksek FODMAP, çiğ sebze ve yüksek lif içeren besinler ile agresif lif yüklemesi",
+            "Düşük protein, yüksek basit şeker ve minimal yağ alımı beslenme stratejisi",
+            "Elemental diyet ve tüm tam gıdalardan kaçınma ile uzun vadeli beslenme yaklaşımı"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: İBD (İnflamatuar Bağırsak Hastalığı) remisyonunda: 1) Omega-3 (EPA/DHA) - anti-inflamatuar eikosanoid üretimi (resolvinler, protektinler), NF-κB inhibisyonu, 2) Çözünebilir lif (psyllium, inulin) - SCFA üretimi (özellikle butirat), bağırsak barrier fonksiyonu, 3) Glutamin - enterosit enerji kaynağı, tight junction proteini üretimi, 4) Fermente gıdalar (probiyotikler) - mikrobiyota dengeleyici, immünomodülasyon. Remisyonda düşük FODMAP gerekli değildir. B şıkkı yüksek FODMAP semptom tetikleyebilir. C şıkkı protein ve yağ yetersizdir. D şıkkı uzun vadede malnütrisyon riski."
+    },
+    {
+        "id": 43,
+        "category": "Davranış Değişikliği",
+        "question": "Bir müşteri, beslenme değişiklikleri için social norms (sosyal normlar) ve descriptive norms'un (betimleyici normlar) etkisinde kalarak unhealthy choices yapıyor. Hangi müdahale norm misperception'ı (norm algısı yanılgısı) düzeltmede en etkilidir?",
+        "options": [
+            "Injunctive norms vurgulama, positive deviance modellerle tanışma ve peer comparison yeniden çerçeveleme stratejisi",
+            "Müşteriye herkesin sağlıksız yediğini onaylama ve sosyal uyumu pekiştirme yaklaşımı",
+            "Sosyal ortamlardan tamamen izole olma ve yalnız yeme alışkanlığı geliştirme metodu",
+            "Sosyal normların önemli olmadığını söyleme ve bireysel farklılığı yok sayma protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Social Norms Theory: descriptive norms (ne yapıldığı) vs. injunctive norms (ne onaylandığı) ayrımı. İnsanlar genellikle sağlıksız davranışları olduğundan fazla tahmin eder (pluralistic ignorance). Müdahale: 1) Injunctive norms vurgulama - çoğunluğun aslında sağlıklı beslenmeyi onayladığını gösterme, 2) Positive deviance - sağlıklı seçimler yapan rol modelleri tanıtma, 3) Peer comparison yeniden çerçeveleme - 'herkes böyle yemiyor' gerçeği. Norm correction, davranışsal conformity'yi azaltır. B şıkkı misperception'ı pekiştirir. C şıkkı gerçekçi değildir ve sosyal izolasyon yaratır. D şıkkı sosyal etkileri görmezden gelir."
+    },
+    {
+        "id": 44,
+        "category": "Beslenme Bilimi",
+        "question": "Bir sporcu, concentric ve eccentric kas kasılmaları sonrası farklı recovery stratejileri uygulamak istiyor. Hangisi eccentric exercise-induced muscle damage (EIMD) sonrası inflamasyonu modüle etmede en uygun beslenme yaklaşımıdır?",
+        "options": [
+            "Polifenol açısından zengin besinler, omega-3 yağ asitleri ve protein alımı ile anti-inflamatuar beslenme",
+            "Yüksek doz NSAİD kullanımı ve minimal besin alımı ile recovery stratejisi",
+            "Sadece karbonhidrat yükleme ve protein almama yaklaşımı ile beslenme protokolü",
+            "Alkol tüketimi ve yüksek sodyum alımı ile inflamatuar yanıtı artırma stratejisi"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: EIMD (excentric exercise-induced muscle damage) - muscle soreness, ödem, güç kaybı yaratır. Z-disk'te mikroyırtılmalar, aseptik inflamasyon (IL-6, TNF-α, CRP yükselir). Optimal recovery beslenme: 1) Polifenoller (çilek, kiraz, kakao) - oksidatif stresi azaltır, inflamasyonu modüle eder, 2) Omega-3 (EPA/DHA) - pro-resolving lipid mediators (resolvinler, protektinler) üretir, 3) Protein (20-40g) - kas remodeling ve adaptasyon için gerekli. Not: kronik NSAİD kullanımı adaptasyonu bloke edebilir. B şıkkı NSAİD uzun vadede zararlı olabilir. C şıkkı protein eksiktir. D şıkkı alkol protein sentezini inhibe eder, recovery'yi bozar."
+    },
+    {
+        "id": 45,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir müşteri, beslenme davranışlarını sürdürmede relapse prevention (geri dönüş önleme) planı oluşturmak istiyor. Hangi Marlatt'ın Relapse Prevention Model stratejisi yüksek riskli durumları yönetmede en kapsamlı yaklaşımı temsil eder?",
+        "options": [
+            "High-risk situations tanımlama, coping strategies geliştirme ve abstinence violation effect yönetimi kombinasyonu",
+            "Tüm yüksek riskli durumlardan tamamen kaçınma ve sosyal izolasyon stratejisi uygulama",
+            "Geri dönüş olursa tamamen vazgeçme ve yeniden başlamama yaklaşımı benimseme metodu",
+            "Sadece irade gücüne güvenme ve planlama yapmama ile spontane baş etme stratejisi"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Marlatt'ın Relapse Prevention Model: 1) High-risk situations tanımlama - negatif duygusal durumlar, sosyal baskı, interpersonal conflict gibi tetikleyicileri belirleme, 2) Coping strategies - her durum için spesifik başa çıkma becerisi (problem-focused, emotion-focused), 3) Abstinence Violation Effect (AVE) yönetimi - tek lapse'in (küçük hata) relapse'e (sürekli geri dönüş) dönüşmesini önleme, 'all-or-nothing' düşüncesiyle mücadele. Self-efficacy her aşamada kritiktir. B şıkkı gerçekçi değildir, yaşamda yüksek riskli durumlar kaçınılmazdır. C şıkkı AVE'yi pekiştirir. D şıkkı irade gücü sınırlıdır, planlama gereklidir."
+    },
+    {
+        "id": 46,
+        "category": "Beslenme Bilimi",
+        "question": "Bir ultra-dayanıklılık atleti, 100+ km koşu sırasında gastrointestinal distres yaşamadan enerji alımını sürdürmek istiyor. Hangi karbonhidrat formülasyonu ve alım stratejisi splanchnic hypoperfusion'a bağlı GI sorunları minimize eder?",
+        "options": [
+            "Çoklu taşıyıcı karbonhidratlar (glukoz:fruktoz 2:1) ve küçük sık dozlar stratejisi",
+            "Tek taşıyıcı yüksek glukoz ve büyük tek doz alımı yaklaşımı",
+            "Yüksek fruktoz, düşük glukoz ve düzensiz alım protokolü uygulaması",
+            "Sadece katı gıda tüketimi ve sıvı karbonhidratlardan kaçınma stratejisi"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Ultra-endurance egzersizde (>2.5 saat) splanchnic kan akımı %60-70 azalır, GI distres riski yüksektir. Optimal strateji: 1) Çoklu taşıyıcı karbonhidratlar (multiple transportable carbs) - glukoz SGLT1, fruktoz GLUT5 ile emilir, kombine alım 90g/saat'e kadar karbonhidrat oksidasyonuna izin verir (tek taşıyıcıda max 60g/saat), 2:1 veya 1:0.8 glukoz:fruktoz oranı, 2) Küçük sık dozlar (15-20 dakikada bir) - gastrik boşalmayı optimize eder, GI distres azalır. Gut training (antrenman sırasında karbonhidrat toleransı geliştirme) önemlidir. B şıkkı GI yükü fazla. C şıkkı yüksek fruktoz mide rahatsızlığı yapar. D şıkkı katı gıda sindirim yavaştır."
+    },
+    {
+        "id": 47,
+        "category": "Davranış Değişikliği",
+        "question": "Bir müşteri, beslenme hedeflerinde düşük perceived behavioral control (algılanan davranışsal kontrol) sergilediğinde, hangi Theory of Planned Behavior müdahalesi kontrol inançlarını güçlendirmede en etkilidir?",
+        "options": [
+            "Control beliefs strengthening, barrier identification ve mastery experiences yaratma stratejisi kombinasyonu",
+            "Müşteriye kontrolün olmadığını kabul ettirme ve dış faktörlere bağımlılık yaratma",
+            "Sadece attitude değişikliğine odaklanma ve behavioral control'ü görmezden gelme yaklaşımı",
+            "Subjective norms manipülasyonu ve sosyal baskı artırma ile kontrol hissi yaratma"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Theory of Planned Behavior (Ajzen): behavioral intention = attitude + subjective norms + perceived behavioral control (PBC). PBC, davranışı gerçekleştirme kolaylığı/zorluğu algısıdır ve en güçlü prediktördür. PBC'yi güçlendirmek için: 1) Control beliefs strengthening - 'yapabilirim' inançlarını güçlendirme, 2) Barrier identification ve problem-solving - engelleri önceden belirleme ve çözüm planları yapma, 3) Mastery experiences - başarılı deneyimler yoluyla self-efficacy artırma. B şıkkı öğrenilmiş çaresizlik yaratır. C şıkkı PBC'yi ihmal eder, ancak PBC intention'ın güçlü belirleyicisidir. D şıkkı subjective norms'a odaklanır ancak içsel kontrol hissi yaratmaz."
+    },
+    {
+        "id": 48,
+        "category": "Beslenme Bilimi",
+        "question": "Bir kadın müşteri, premenstrüel sendrom (PMS) ile ilişkili semptomları azaltmak için beslenme stratejisi arıyor. Hangisi serotonerjik disregülasyon ve prostaglandin dengesizliğini en etkili şekilde modüle eder?",
+        "options": [
+            "Kompleks karbonhidratlar, magnezyum, B6 vitamini ve omega-3 yağ asitleri kombinasyonu",
+            "Yüksek basit şeker, düşük magnezyum ve yüksek kafein alımı stratejisi",
+            "Düşük karbonhidrat, yüksek doymuş yağ ve minimal mikro besin alımı",
+            "Sadece protein bazlı beslenme ve tüm karbonhidratlardan kaçınma protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: PMS patogenezinde serotonin disregülasyonu ve prostaglandin dengesizliği rol oynar. Optimal beslenme: 1) Kompleks karbonhidratlar - triptofan brain uptake'ini artırır (insülin triptofan transport'unu kolaylaştırır), serotonin sentezi, 2) Magnezyum - NMDA reseptör antagonisti, nöromüsküler irritabilite azalır, PMS'te magnezyum seviyeleri düşer, 3) B6 vitamini - serotonin ve dopamin sentezinde kofaktör, 4) Omega-3 - prostaglandin E2 (pro-inflamatuar) azalır, prostaglandin E1 ve E3 (anti-inflamatuar) artar. B şıkkı kafein anksiyete artırır. C ve D şıkları karbonhidrat yetersizliği serotonin sentezini bozar."
+    },
+    {
+        "id": 49,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir müşteri, beslenme koçluğunda goal gradient effect (hedef gradyan etkisi) nedeniyle hedefe yaklaştıkça motivasyon kaybı yaşıyor. Hangi strateji finish line aversion'ı (bitiş çizgisi kaçınması) önlemede en etkilidir?",
+        "options": [
+            "Process goals belirleme, sürekli progress tracking ve yeni intermediate goals oluşturma stratejisi",
+            "Tüm hedefleri kaldırma ve hedefsiz beslenme yaklaşımına geçiş yapma metodu",
+            "Sadece final outcome'a odaklanma ve ara hedefleri görmezden gelme yaklaşımı",
+            "Hedefe ulaşınca koçluğu sonlandırma ve müşteriye bağımsızlık verme protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Goal gradient hypothesis (Clark Hull), hedefe yaklaştıkça motivasyonun arttığını öngörür, ancak bazı kişiler 'finish line aversion' yaşar - hedefe çok yaklaşınca kaygı veya motivasyon kaybı. Müdahale: 1) Process goals (outcome yerine) - davranışlara odaklanma ('günde 3 porsiyon sebze' vs. '5 kilo verme'), 2) Progress tracking - küçük kazanımları görünür kılma, momentum sürdürme, 3) Yeni intermediate goals - hedefe ulaştıktan sonra yeni hedefler belirleyerek süreklilik sağlama (maintenance goals). B şıkkı yapı eksikliği yaratır. C şıkkı sadece outcome odaklıdır, süreç ihmal edilir. D şıkkı ani destek kesilmesi relapse riskini artırır."
+    },
+    {
+        "id": 50,
+        "category": "Beslenme Bilimi",
+        "question": "Bir tip 2 diyabetli müşteri, postprandiyal glisemik yanıtı düzenlemek için meal sequencing (öğün sıralaması) stratejisi uygulamak istiyor. Hangi besin tüketim sırası glukoz ekskursiyonunu en etkili şekilde azaltır?",
+        "options": [
+            "Önce sebze ve protein, sonra karbonhidrat tüketimi ile gastrik boşalma yavaşlatma",
+            "Önce karbonhidrat, sonra protein ve sebze ile hızlı karbonhidrat emilimi",
+            "Tüm besinleri karışık tüketme ve sıralama yapmama yaklaşımı uygulama",
+            "Sadece karbonhidrat tüketimi ve diğer makrobesinlerden kaçınma stratejisi"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Meal sequencing araştırmaları, besin tüketim sırasının postprandiyal glisemik yanıtı etkilediğini gösterir. Optimal sıra: 1) Önce sebze (lif) - gastrik içeriği viskoz hale getirir, glukoz emilimini yavaşlatır, 2) Protein ve yağ - GIP (glukoz-bağımlı insulinotropik polipeptid) ve GLP-1 (glukagon-like peptide-1) salınımını artırır, gastrik boşalmayı yavaşlatır, 3) Son olarak karbonhidrat - daha yavaş emilim, daha düşük glukoz piki. Araştırmalar, bu sırayla tüketimin postprandiyal glukoz yanıtını %30-50 azalttığını gösterir. B şıkkı karbonhidratı ilk tüketir, hızlı glukoz piki. C ve D şıkları optimal sıralamayı kullanmaz."
+    },
+    {
+        "id": 51,
+        "category": "Davranış Değişikliği",
+        "question": "Bir müşteri, beslenme davranışlarında action-outcome contingency learning (eylem-sonuç koşullu öğrenme) zayıflığı gösteriyor ve davranış-sonuç bağlantısı kurmakta zorlanıyor. Hangi behavioral intervention en etkili contingency awareness geliştirir?",
+        "options": [
+            "Structured self-monitoring, immediate feedback loops ve behavior-outcome mapping stratejisi kombinasyonu",
+            "Uzun vadeli hedefler belirleme ve feedback vermeme ile öğrenmeyi geciktirme yaklaşımı",
+            "Müşteriye sonuçların rastgele olduğunu söyleme ve kontrol hissi azaltma metodu",
+            "Sadece motivasyonel konuşmalar ve somut davranış takibi yapmama protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Action-outcome contingency learning, davranış ile sonuç arasındaki nedensel ilişkiyi öğrenmedir (operant conditioning'in temeli). Zayıf contingency awareness, davranış değişikliğini engeller. Müdahale: 1) Structured self-monitoring - spesifik davranışları (su tüketimi, porsiyon kontrol) ve sonuçları (enerji seviyeleri, açlık, performans) kaydetme, 2) Immediate feedback loops - kısa döngüler, hızlı geri bildirim (günlük vs. haftalık), 3) Behavior-outcome mapping - görsel grafikler, davranış-sonuç ilişkisini netleştirme. Bu yaklaşım, self-efficacy ve perceived control artırır. B şıkkı gecikmiş feedback contingency öğrenmeyi zorlaştırır. C şıkkı öğrenilmiş çaresizlik yaratır. D şıkkı somut veri eksikliği bağlantı kurmayı engeller."
+    },
+    {
+        "id": 52,
+        "category": "Beslenme Bilimi",
+        "question": "Bir kadın sporcu, luteal faz boyunca artan progesteron seviyelerinin metabolik etkilerini optimize etmek istiyor. Hangisi luteal fazda enerji substrat kullanımını ve performansı en iyi destekler?",
+        "options": [
+            "Hafif karbonhidrat artışı, yeterli kalori alımı ve mikro besin optimizasyonu kombinasyonu",
+            "Agresif kalori kısıtlaması ve çok düşük karbonhidrat alımı stratejisi",
+            "Sadece yağ tüketimi ve karbonhidratlardan tamamen kaçınma protokolü uygulaması",
+            "Çok yüksek protein, minimal yağ ve düşük toplam kalori alımı"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Luteal fazda (menstrüel siklusun 2. yarısı) progesteron yükselir ve metabolik değişiklikler olur: 1) Bazal metabolik hız ~5-10% artar, 2) Yağ oksidasyonu tercih edilir (carbohydrate sparing), 3) Protein katabolizması artar, 4) Core body temperature yükselir. Optimal beslenme: 1) Hafif karbonhidrat artışı - glikojen depolarını korumak için, özellikle yüksek yoğunluklu egzersizde, 2) Yeterli total kalori - artan BMR'yi karşılamak için (~100-300 kcal/gün ekstra), 3) Mikro besinler - özellikle magnezyum, B vitaminleri. B şıkkı kalori kısıtlaması hormonal dengeyi bozabilir. C şıkkı çok düşük karbonhidrat yüksek yoğunluklu performansı bozar. D şıkkı yağ yetersizdir."
+    },
+    {
+        "id": 53,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir müşteri, beslenme hedeflerinde identity-based habits (kimlik tabanlı alışkanlıklar) oluşturmak istiyor. Hangi James Clear'in Atomic Habits yaklaşımı identity shift için en etkili stratejik çerçeveyi temsil eder?",
+        "options": [
+            "Outcome yerine identity odaklı hedefler ve small wins ile identity reinforcement stratejisi",
+            "Sadece sonuç hedeflerine odaklanma ve kimlik değişimini görmezden gelme yaklaşımı",
+            "Büyük kimlik değişimi hedefleme ve küçük adımları önemsememe metodu uygulaması",
+            "Mevcut kimliği koruma ve sadece davranışsal değişiklik yapma protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: James Clear'in 'Atomic Habits' çerçevesi, davranış değişikliğinin üç katmanını tanımlar: 1) Outcome (sonuç) - ne elde etmek istiyorsun, 2) Process (süreç) - ne yapıyorsun, 3) Identity (kimlik) - ne tip insan olmak istiyorsun. En sürdürülebilir değişiklik identity layer'dan başlar. Identity-based habits: 1) 'Sağlıklı yiyen bir insan olmak istiyorum' yerine 'Ben sağlıklı yiyen bir insanım', 2) Small wins - her küçük sağlıklı seçim yeni kimliğe 'oy verir', 3) Identity reinforcement - davranışlar kimliği pekiştirir, kimlik davranışları kolaylaştırır (positive feedback loop). B şıkkı sadece outcome odaklıdır. C şıkkı büyük değişim gerçekçi değildir. D şıkkı identity'yi ihmal eder."
+    },
+    {
+        "id": 54,
+        "category": "Beslenme Bilimi",
+        "question": "Bir vegetaryen sporcu, heme olmayan demir kaynağından emilimi optimize ederken fitik asit ve tanik asidin inhibitör etkilerini minimize etmek istiyor. Hangi kombinasyon strateji en yüksek biyoyararlanımı sağlar?",
+        "options": [
+            "Vitamin C kaynağı ile demir tüketimi, tahılları ıslatma-çimlendirme ve polifenolleri ayrı tüketme",
+            "Yüksek fitik asit içeren besinlerle demir alımı ve kalsiyum takviyesi kombinasyonu",
+            "Demir takviyelerini çay ve kahve ile birlikte alma stratejisi uygulama",
+            "Sadece işlenmemiş tahıllarla demir alımı ve C vitamini almama protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Non-heme demir (bitkisel kaynaklar) biyoyararlanımı düşüktür (~2-20% vs. heme demir ~15-35%). Optimizasyon stratejileri: 1) Enhancers - Vitamin C (askorbik asit) demiri ferröz forma indirger, emilim 3-4 kat artar; organik asitler (sitrik asit, malik asit), 2) Inhibitörleri azaltma - Fitik asit (tahıl, baklagiller): ıslatma, çimlendirme, fermantasyon fitik asidi azaltır; Polifenoller/tanenler (çay, kahve): demir öğünlerinden 1-2 saat sonra tüketme, 3) Kalsiyumu ayırma - kalsiyum hem heme hem non-heme demir emilimini inhibe eder. B şıkkı kalsiyum ile inhibisyon. C şıkkı polifenoller emilimi azaltır. D şıkkı fitik asit yüksek ve C vitamini eksik."
+    },
+    {
+        "id": 55,
+        "category": "Davranış Değişikliği",
+        "question": "Bir müşteri, beslenme davranış değişikliğinde autonomy vs. controlled motivation ayrımını anlamak istiyor ve intrinsic regulation geliştirmeyi hedefliyor. Hangi Self-Determination Theory continuum hareketi en sürdürülebilir motivasyonu yaratır?",
+        "options": [
+            "External regulation'dan identified regulation ve integrated regulation'a doğru internalization süreci ilerlemesi",
+            "Intrinsic motivation'dan external motivation'a doğru hareket ederek dışsal ödüller artırma",
+            "Amotivation'dan external regulation'a geçiş ve orada kalma stratejisi uygulama metodu",
+            "Sadece introjected regulation'da kalma ve guilt-based motivation ile sürdürme yaklaşımı"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: SDT Motivasyon Kontinuumu (en az özerk → en özerk): Amotivation → External Regulation (ödül/ceza) → Introjected Regulation (suçluluk/gurur) → Identified Regulation (kişisel değerler) → Integrated Regulation (kimlikle bütünleşme) → Intrinsic Motivation (içsel zevk). Sürdürülebilir davranış değişikliği için internalization (dışsal motivasyonun içselleştirilmesi) kritiktir. İdeal hareket: External → Identified → Integrated. Identified regulation: 'sağlıklı olmak benim için önemli çünkü ailemle aktif olmak istiyorum' (kişisel değer). Integrated: davranış kimliğin parçası olur. B şıkkı ters yönde hareket, sürdürülemez. C şıkkı external'da kalma uzun vadede motivasyon kaybı. D şıkkı introjection (suçluluk) stresli ve sürdürülemez."
+    },
+    {
+        "id": 56,
+        "category": "Beslenme Bilimi",
+        "question": "Bir müşteri, NAD+ (nikotinamid adenin dinükleotid) seviyelerini artırarak mitokondriyal sağlık ve longevity'yi optimize etmek istiyor. Hangi beslenme yaklaşımı NAD+ biosynthesis ve recycling'i en etkili destekler?",
+        "options": [
+            "Niasin (B3) alımı, triptofan içeren besinler ve sirtuin aktivatörü polifenoller kombinasyonu",
+            "Sadece yüksek şeker alımı ve NAD+ tüketen PARP enzim aktivasyonu stratejisi",
+            "Düşük protein, minimal B vitamini alımı ve NAD+ prekürsörlerinden kaçınma yaklaşımı",
+            "Yüksek alkol tüketimi ve nikotinamid alımından tamamen kaçınma protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: NAD+ mitokondriyal metabolizma, DNA tamiri, sirtuin fonksiyonu için kritik koenzimdir. Yaşla birlikte NAD+ seviyeleri azalır. Optimizasyon: 1) Niasin (B3) - nikotinamid, nikotinik asit (NAD+ sentez precursors), 2) Triptofan - de novo NAD+ sentezi (Triptofan → Kinürenin → NAD+, ama daha az etkili), 3) NAD+ prekürsörleri - NR (nicotinamide riboside), NMN (nicotinamide mononucleotide), 4) Sirtuin aktivatörleri - resveratrol, kuersetin NAD+'yi kullanan sirtuinleri aktive eder (hormesis). B şıkkı yüksek şeker PARP'ı aktive eder, NAD+ tüketir. C şıkkı prekürsör yetersizliği. D şıkkı alkol NAD+ metabolizmasını bozar."
+    },
+    {
+        "id": 57,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir müşteri, beslenme koçluğunda metacognitive awareness (üst-bilişsel farkındalık) geliştirmek istiyor ve eating automaticity'yi (otomatik yeme) azaltmayı hedefliyor. Hangi mindfulness intervention en etkili metacognitive monitoring sağlar?",
+        "options": [
+            "RAIN tekniği (Recognize-Allow-Investigate-Nurture) ve mindful eating practice ile farkındalık artırma kombinasyonu",
+            "Multitasking while eating ve dikkat dağıtma ile otomatik yeme stratejisi pekiştirme",
+            "Yemek sırasında TV izleme ve telefon kullanma ile mindless eating yaklaşımı",
+            "Hızlı yeme ve satiety signals'i görmezden gelme ile verimlilik artırma protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Metacognitive awareness, kişinin kendi düşünce ve davranış süreçlerini gözlemleme kapasitesidir. Eating automaticity (habit-driven, mindless eating) ile mücadele için: 1) RAIN (Tara Brach) - Recognize (dürtüyü tanı), Allow (kabul et, bastırma), Investigate (merakla incele: 'Bu dürtü nereden geliyor?'), Nurture (kendine şefkatle davran), 2) Mindful eating practice - duyusal deneyime odaklanma (tat, doku, koku), yavaş yeme, açlık-tokluk sinyallerine dikkat, 3) Decentering - düşünce ve duygulardan mesafe alma ('Yemek yeme dürtüsü VAR' vs. 'Yemek YEMELİYİM'). B, C, D şıkları mindless eating'i pekiştirir, metacognitive awareness azaltır."
+    },
+    {
+        "id": 58,
+        "category": "Beslenme Bilimi",
+        "question": "Bir hipertansif müşteri, DASH diyeti prensiplerini uygulamak istiyor ancak sodyum kısıtlaması yaparken potasyum, kalsiyum ve magnezyum alımını optimize etmeyi hedefliyor. Hangi besin kombinasyonu blood pressure regulation için en uygun mineral dengesini sağlar?",
+        "options": [
+            "Yeşil yapraklılar, baklagiller, süt ürünleri ve kabuklu yemişler ile yüksek K-Ca-Mg alımı",
+            "Yüksek sodyumlu işlenmiş gıdalar ve düşük potasyum alımı stratejisi uygulaması",
+            "Sadece kalsiyum takviyesi ve besinlerden mineral alımı yapmama yaklaşımı metodu",
+            "Düşük sebze-meyve tüketimi ve yüksek hayvansal protein odaklı beslenme protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: DASH (Dietary Approaches to Stop Hypertension) diyeti, kan basıncını düşürür. Mekanizma: yüksek potasyum, kalsiyum, magnezyum + düşük sodyum. 1) Potasyum - natriürez (sodyum atılımı) artırır, vasküler düz kas tonusunu azaltır (4700 mg/gün target), kaynaklar: yeşil yapraklılar, fasulye, patates, avokado, 2) Kalsiyum - vasküler düz kas gevşemesi (1000-1200 mg/gün), kaynaklar: süt ürünleri, tahini, sardunya, 3) Magnezyum - kalsiyum antagonisti, nitrik oksit üretimi (400 mg/gün), kaynaklar: kabuklu yemişler, tohumlar, tam tahıllar. İdeal Na:K oranı <1. B şıkkı yüksek sodyum kontraendike. C şıkkı takviye yerine besinler tercih edilir. D şıkkı düşük K-Ca-Mg."
+    },
+    {
+        "id": 59,
+        "category": "Davranış Değişikliği",
+        "question": "Bir müşteri, beslenme davranış değişikliğinde cognitive load azaltmak ve decision fatigue'i (karar yorgunluğu) minimize etmek istiyor. Hangi strategy implementation intention ve habit stacking ile cognitive burden'ı en etkili azaltır?",
+        "options": [
+            "Pre-decision yapma, meal prep routine ve if-then planning ile otomasyon yaratma kombinasyonu",
+            "Her öğünde yeni kararlar alma ve spontane seçimler yapma stratejisi uygulama",
+            "Karmaşık besin takip sistemleri ve sürekli kalori hesaplama protokolü oluşturma metodu",
+            "Günde 10+ farklı beslenme kararı alma ve her seçimi ayrı değerlendirme yaklaşımı"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Decision fatigue (Roy Baumeister), ego depletion teorisi - her karar irade gücü harcar, gün ilerledikçe karar kalitesi düşer. Cognitive load azaltma: 1) Pre-decision - önceden kararlar alma (örn: 'pazartesi kahvaltı: yulaf ezmesi'), 2) Meal prep - haftalık hazırlık, anlık kararları ortadan kaldırır, 3) If-then planning - otomasyon ('eğer öğle olursa, önceden hazırladığım öğünü yerim'), 4) Habit stacking (James Clear) - mevcut alışkanlığa yeni davranış ekleme ('kahvaltıdan sonra vitamin alırım'). Bu stratejiler, System 1 (otomatik) düşünceyi kullanır, System 2 (bilinçli, yorucu) düşünceyi azaltır. B, C, D şıkları cognitive load artırır."
+    },{
+        "id": 60,
+        "category": "Beslenme Bilimi",
+        "question": "Bir sporcu, exercise-induced immunosuppression (egzersiz kaynaklı immünosupresyon) sonrası upper respiratory tract infection (ÜSYE) riskini azaltmak istiyor. Hangi beslenme immünomodülasyon stratejisi post-exercise immune function'ı en iyi destekler?",
+        "options": [
+            "Karbonhidrat alımı (30-60g/saat), polifenoller, probiyotikler ve vitamin D optimizasyonu kombinasyonu",
+            "Egzersiz sonrası hiç besin almama ve extended fasting protokolü uygulama yaklaşımı",
+            "Sadece protein takviyesi ve karbonhidratlardan kaçınma stratejisi uygulaması metodu",
+            "Yüksek doz vitamin C mega-dozajı ve diğer besinleri görmezden gelme"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Yoğun/uzun süreli egzersiz (>1.5 saat, yüksek yoğunluk) sonrası 'open window' - geçici immünosupresyon (3-72 saat), ÜRTI riski artar. İmmün destek: 1) Karbonhidrat - kortizol ve epinefrin yanıtını azaltır (bu hormonlar immünosupresif), 30-60g/saat egzersiz sırasında, 2) Polifenoller (quercetin) - anti-inflamatuar, immünomodülatör, 3) Probiyotikler (Lactobacillus, Bifidobacterium) - gut-associated lymphoid tissue (GALT) destekler, ÜRTI insidansını azaltır, 4) Vitamin D - immün hücre fonksiyonu, antimikrobiyal peptid sentezi. B şıkkı fasting immünosupresyonu kötüleştirebilir. C şıkkı karbonhidrat eksikliği kortizol yüksek tutar. D şıkkı mega-doz C vitamini araştırmalar tarafından desteklenmez."
+    },
+    {
+        "id": 61,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir müşteri, beslenme davranışlarında psychological flexibility (psikolojik esneklik) geliştirmek ve experiential avoidance'tan (deneyimsel kaçınma) uzaklaşmak istiyor. Hangi Acceptance and Commitment Therapy (ACT) stratejisi en kapsamlı psychological flexibility yaratır?",
+        "options": [
+            "Values clarification, defusion techniques ve committed action ile altı temel ACT sürecini uygulama",
+            "Olumsuz düşünce ve duyguları bastırma ve kaçınma ile rahatlık arama yaklaşımı",
+            "Sadece bilişsel yeniden yapılandırma ve düşünceleri değiştirme stratejisi uygulama metodu",
+            "Mükemmeliyetçi hedefler koyma ve esneklikten tamamen kaçınma protokolü oluşturma"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: ACT (Steven Hayes), psychological flexibility için altı temel süreç tanımlar: 1) Present moment awareness (şimdiye odaklanma), 2) Defusion (düşüncelerden mesafe alma, 'bir düşünce sadece düşüncedir'), 3) Acceptance (olumsuz deneyimleri kabul etme, bastırmama), 4) Self-as-context (gözlemci benlik), 5) Values (kişisel değerleri netleştirme), 6) Committed action (değerler doğrultusunda eylem). Experiential avoidance (olumsuz duygulardan kaçınma girişimi) patolojinin temelidir. ACT, içeriği değiştirmek yerine (CBT gibi) içerikle ilişkiyi değiştirir. B şıkkı experiential avoidance pekiştirir. C şıkkı CBT yaklaşımı, ACT değil. D şıkkı inflexibility yaratır."
+    },
+    {
+        "id": 62,
+        "category": "Beslenme Bilimi",
+        "question": "Bir müşteri, hepatik steatosis (karaciğer yağlanması) riskini azaltmak için beslenme stratejisi arıyor ve de novo lipogenesis'i minimize etmeyi hedefliyor. Hangi diyet kompozisyonu hepatik trigliserit akümülasyonunu en etkili şekilde azaltır?",
+        "options": [
+            "Düşük fruktoz, omega-3 yağ asitleri, kolin ve antioksidanlar ile karaciğer sağlığı optimizasyonu",
+            "Yüksek fruktoz, düşük protein ve minimal kolin alımı stratejisi uygulama",
+            "Aşırı alkol tüketimi ve yüksek doymuş yağ kombinasyonu beslenme yaklaşımı",
+            "Sadece yağsız diyet ve esansiyel yağ asitlerinden kaçınma protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: NAFLD (non-alcoholic fatty liver disease) patogenezinde de novo lipogenesis (DNL) kritiktir. Optimizasyon: 1) Düşük fruktoz - fruktoz karaciğerde metabolize edilir ve DNL'yi güçlü şekilde stimüle eder (glukozdan daha fazla), HFCS ve şekerli içeceklerden kaçınma, 2) Omega-3 (EPA/DHA) - SREBP-1c (lipogenez düzenleyici) azaltır, beta-oksidasyon artırır, 3) Kolin - VLDL sekresyonu için gerekli, kolin eksikliği hepatik trigliserit akümülasyonu yapar, 4) Antioksidanlar (E vitamini, polifenoller) - oksidatif stresi azaltır. Akdeniz diyeti NAFLD'de etkilidir. B şıkkı yüksek fruktoz DNL artırır. C şıkkı alkol hepatotoksik. D şıkkı esansiyel yağ asitleri gereklidir."
+    },
+    {
+        "id": 63,
+        "category": "Davranış Değişikliği",
+        "question": "Bir müşteri, beslenme hedeflerinde approach goals (yaklaşma hedefleri) yerine avoidance goals (kaçınma hedefleri) belirleme eğilimi gösteriyor ve bu durum motivasyonu azaltıyor. Hangi goal-framing stratejisi promotion focus (ilerleme odağı) geliştirmede en etkilidir?",
+        "options": [
+            "Negatif çerçeveli hedefleri pozitif approach goals'a dönüştürme ve gain-framed messaging kullanma",
+            "Sadece kaçınılması gereken besinleri listeleme ve kısıtlama odaklı yaklaşım sürdürme",
+            "Loss-framed messaging kullanarak korku temelli motivasyon yaratma stratejisi uygulama",
+            "Prevention focus vurgulama ve risk minimizasyonu ile güvenlik odaklı hedefleme"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Regulatory Focus Theory (Higgins): Promotion focus (kazançlara odaklanma, idealler) vs. Prevention focus (kayıpları önleme, sorumluluklar). Approach goals ('X yapmak istiyorum') > Avoidance goals ('Y yapmamak istiyorum') motivasyon ve başarı açısından. Goal-framing: 1) Negatiften pozitife dönüşüm - 'Fast food yemeyeceğim' → 'Haftada 5 gün evde pişireceğim', 2) Gain-framed messaging - 'bu davranışla ne kazanacaksın' vurgusu (enerji, performans, sağlık), 3) Aspirational language - 'istiyorum', 'olmak istiyorum' dili. Approach goals, dopaminerjik reward sistemi aktive eder. B ve C şıkları avoidance/prevention focus pekiştirir. D şıkkı prevention focus kullanır, promotion kadar motivasyonel değildir."
+    },
+    {
+        "id": 64,
+        "category": "Beslenme Bilimi",
+        "question": "Bir kadın müşteri, postmenopozal osteoporoz riskini azaltmak için beslenme stratejisi arıyor ve osteoblast aktivitesini optimize etmeyi hedefliyor. Hangi mikrobesin kombinasyonu bone modeling ve remodeling sürecini en kapsamlı destekler?",
+        "options": [
+            "Kalsiyum, D vitamini, K2, magnezyum, bor ve silikon içeren çoklu mikrobesin yaklaşımı",
+            "Sadece kalsiyum takviyesi ve diğer kemik sağlığı besinlerini görmezden gelme",
+            "Yüksek sodyum, düşük kalsiyum ve minimal D vitamini alımı stratejisi",
+            "Fosfor kısıtlaması ve tüm süt ürünlerinden kaçınma protokolü uygulaması"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Kemik sağlığı, sadece kalsiyum değil, çoklu mikrobesin sinerji gerektirir: 1) Kalsiyum (1200 mg/gün postmenopozal) - hidroksiapatit kristal yapısı, 2) Vitamin D3 (800-1000 IU) - kalsiyum emilimi, osteoblast diferansiyasyonu, 3) Vitamin K2 (MK-7) - osteokalsin karboksilasyonu (kalsiyumun kemiklere bağlanması), 4) Magnezyum - kemik matriks bileşeni, PTH regulasyonu, 5) Bor - D vitamini metabolizması, östrojen seviyelerini destekler, 6) Silikon - kolajen sentezi, kemik mineralizasyonu. Protein alımı da kritiktir (1.0-1.2 g/kg). B şıkkı yetersizdir, kemik sağlığı çok faktörlüdür. C şıkkı yüksek sodyum kalsiüri yapar. D şıkkı fosfor kemik için gereklidir (Ca:P oranı önemli)."
+    },
+    {
+        "id": 65,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir müşteri, beslenme davranış değişikliğinde temporal construal (zamansal kavrayış) değiştirerek long-term thinking geliştirmek istiyor. Hangi Construal Level Theory müdahalesi psychological distance azaltmada ve future self-connection artırmada en etkilidir?",
+        "options": [
+            "Episodic future thinking, vivid imagery ve future self-letter writing kombinasyonu uygulama",
+            "Sadece kısa vadeli somut hedeflere odaklanma ve uzun vadeyi görmezden gelme",
+            "Abstract düşünme ve uzak gelecekle bağlantı kurmama stratejisi uygulama yaklaşımı",
+            "Present-moment'a takılı kalma ve gelecek planlamasından kaçınma protokolü oluşturma"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Construal Level Theory (Trope & Liberman): psikolojik mesafe (temporal, spatial, social) artıkça düşünce daha abstract (high-level construal) olur. Uzak gelecek için abstract düşünme, davranış değişikliğini zorlaştırır. Müdahale: 1) Episodic future thinking - gelecek benliği somut, detaylı, birinci şahıs olarak hayal etme ('40 yaşımda, sabah koşusundan sonra, kendimi enerjik hissederken...'), 2) Vivid imagery - duyusal detaylar ekleme, canlı zihinsel simülasyon, 3) Future self-letter - gelecek benlikten bugünkü benliğe mektup yazma, perspektif değişimi. Bu teknikler psychological distance'ı azaltır ve future self-continuity artırır. B şıkkı sadece yakın vade, uzun vade ihmal. C ve D şıkları gelecek bağlantısını engellerler."
+    },
+    {
+        "id": 66,
+        "category": "Beslenme Bilimi",
+        "question": "Bir sporcu, eccentric-induced delayed onset muscle soreness (DOMS) sonrası inflamatuar yanıtı modüle etmek ve recovery süresini kısaltmak istiyor. Hangi nutrisyonel timing stratejisi resolution phase'i (çözünürlük fazı) en etkili şekilde destekler?",
+        "options": [
+            "Omega-3 EPA/DHA ile specialized pro-resolving mediators üretimi ve polifenol desteği kombinasyonu",
+            "Yüksek doz NSAİD kullanımı ve besinsel anti-inflamatuar stratejiden kaçınma yaklaşımı",
+            "Sadece karbonhidrat yükleme ve protein ile omega-3 almama protokolü uygulaması",
+            "Pro-inflamatuar omega-6 artırma ve anti-inflamatuar besinlerden kaçınma stratejisi"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: DOMS, eksentrik kasılma sonrası inflamasyon içerir (akut faz: pro-inflamatuar → resolution faz: pro-resolving mediators). Resolution phase kritiktir: 1) Omega-3 EPA/DHA - SPMs (specialized pro-resolving mediators: resolvinler, protektinler, marsinler) üretir, inflamasyonu aktif olarak çözer (sadece baskılamaz), 2) Polifenoller (kiraz, zerdeçal kurkumini) - NF-κB inhibisyonu, oksidatif stresi azaltır, 3) Protein - kas remodeling için gerekli. Önemli: kronik NSAİD kullanımı adaptasyonu bloke edebilir, SPMs daha fizyolojiktir. B şıkkı NSAİD uzun vadede zararlı olabilir, adaptasyonu engeller. C şıkkı omega-3 eksik, resolution yetersiz. D şıkkı pro-inflamatuar, resolution'ı geciktirir."
+    },
+    {
+        "id": 67,
+        "category": "Davranış Değişikliği",
+        "question": "Bir müşteri, beslenme davranışlarında ego depletion (ego tükenmesi) deneyimliyor ve irade gücü sınırlı kaynak gibi tükeniyor. Hangi müdahale self-control resource'unu korumada ve ego depletion etkilerini minimize etmede en etkilidir?",
+        "options": [
+            "Implementation intentions, environmental design ve glucose homeostasis optimizasyonu kombinasyonu uygulama",
+            "Sürekli irade gücü kullanımı ve zorlu kararlar alma ile ego kas geliştirme",
+            "Açlık durumunda önemli beslenme kararları alma ve düşük glukoz toleransı stratejisi",
+            "Tüm planlamadan vazgeçme ve sadece anlık irade gücüne güvenme yaklaşımı"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Ego depletion (Baumeister): self-control sınırlı kaynaktır, kullanıldıkça tükenir. Ancak yeni araştırmalar motivasyonel faktörleri vurgular. Ego depletion'ı azaltma: 1) Implementation intentions - 'eğer-o zaman' planları, karar verme ihtiyacını azaltır, otomatiklik yaratır, 2) Environmental design - choice architecture, sağlıklı seçimleri default yapmak, irade gücü gerektirmeyen ortam, 3) Glucose homeostasis - kan şekeri düşüklüğü self-control'ü azaltır, dengeli beslenme, 4) Motivasyon - içsel motivasyon ego depletion'ı azaltır. B şıkkı 'ego kas' teorisi tartışmalıdır, sürekli zorlama yorgunluk yaratır. C şıkkı açlık durumu kötü karar verir. D şıkkı yapı eksikliği, irade gücü sınırlıdır."
+    },
+    {
+        "id": 68,
+        "category": "Beslenme Bilimi",
+        "question": "Bir kadın sporcu, low energy availability (düşük enerji mevcudiyeti) durumundan çıkmak ve metabolic adaptation'ı reverse etmek istiyor. Hangi reverse dieting stratejisi metabolic rate'i en güvenli şekilde restore eder?",
+        "options": [
+            "Gradual kalori artışı (100-200 kcal/hafta), karbonhidrat öncelikli, strength training kombinasyonu",
+            "Aniden yüksek kalori yükleme ve maksimum hızlı kilo alma yaklaşımı uygulama",
+            "Kalori artışı yapmama ve düşük enerji durumunu sürdürme stratejisi protokolü",
+            "Sadece yağ artışı ve karbonhidrat-protein düşük tutma ile beslenme yaklaşımı"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Low energy availability (EA < 30 kcal/kg FFM/gün) metabolik adaptasyon yaratır: BMR azalır, hormon supresyonu (leptin, T3, sex hormonlar). Reverse dieting: 1) Gradual kalori artışı - haftalık 100-200 kcal (veya %5-10) artış, adaptif termogenezi yavaşça restore eder, aşırı yağ kazanımını önler, 2) Karbonhidrat öncelikli - leptin ve T3 seviyelerini restore eder (yağdan daha etkili), tiroid fonksiyonunu iyileştirir, 3) Strength training - yağsız kütle korur/artırır, BMR yükseltir. Hedef: EA > 45 kcal/kg FFM/gün. B şıkkı hızlı yağ kazanımı riski. C şıkkı metabolik baskılanmayı sürdürür. D şıkkı karbonhidrat hormonal recovery için kritiktir."
+    },
+    {
+        "id": 69,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir müşteri, beslenme davranış değişikliğinde outcome expectancies (sonuç beklentileri) ile actual outcomes arasında discrepancy yaşıyor ve motivation kaybediyor. Hangi expectancy violation müdahalesi realistic expectation setting'de en etkilidir?",
+        "options": [
+            "Accurate information provision, timeline recalibration ve process-oriented milestones belirleme kombinasyonu",
+            "Gerçekçi olmayan beklentileri pekiştirme ve hızlı sonuç vaatleri verme yaklaşımı",
+            "Müşteriye hiçbir beklenti yaratmama ve belirsizlik içinde bırakma stratejisi metodu",
+            "Sadece outcome odaklı hedefler ve somut süreç göstergelerini görmezden gelme"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Outcome expectancies (Bandura), davranışın belli sonuçlar üreteceği inancıdır. Gerçekçi olmayan beklentiler (örn: '1 ayda 10 kilo') motivasyon kaybına yol açar. Müdahale: 1) Accurate information - gerçekçi timeline ve oran (sağlıklı kilo kaybı 0.5-1 kg/hafta, plato dönemleri normal), 2) Timeline recalibration - uzun vadeli perspektif, sabır geliştirme, 3) Process-oriented milestones - davranışsal kazanımları vurgulama (outcome yerine), 'haftada 4 gün meal prep yaptım'. Bu yaklaşım, outcome vs. process orientation dengeler. B şıkkı gerçekçi değildir, daha büyük hayal kırıklığı yaratır. C şıkkı belirsizlik anksiyete yaratır. D şıkkı sadece outcome, süreç ihmal edilir."
+    },
+    {
+        "id": 70,
+        "category": "Beslenme Bilimi",
+        "question": "Bir müşteri, circadian rhythm optimization yoluyla metabolik sağlığı iyileştirmek ve insulin sensitivity'yi artırmak istiyor. Hangi chrononutrition stratejisi peripheral clock genes'i ve metabolic efficiency'yi en etkili şekilde senkronize eder?",
+        "options": [
+            "Time-restricted eating (8-10 saat), sabah kalori yükleme ve gece açlık protokolü kombinasyonu",
+            "Gece ağır öğünler ve sabah hiç yemek yememe stratejisi uygulama",
+            "Düzensiz öğün zamanları ve random eating pattern ile esneklik yaratma yaklaşımı",
+            "24 saat sürekli snacking ve öğün zamanlarını görmezden gelme protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Circadian rhythm, metabolik süreçleri düzenler (clock genes: BMAL1, CLOCK, PER, CRY). Chrononutrition: 1) Time-restricted eating (TRE) - eating window 8-10 saat, fasting window 14-16 saat, peripheral clocks'ı senkronize eder, 2) Sabah kalori yükleme - insülin sensitivitesi sabah en yüksektir, glukoz toleransı optimal, melatonin (akşam yükselir) insülin sekresyonunu inhibe eder, 3) Gece açlık - nocturnal fasting, autophagy, metabolic switching (glukozdan ketona). Araştırmalar, TRE'nin metabolic health, insulin sensitivity, weight management'ı iyileştirdiğini gösterir. B şıkkı gece yemek circadian misalignment yaratır. C ve D şıkları clock genes'i desenkronize eder."
+    },
+    {
+        "id": 71,
+        "category": "Davranış Değişikliği",
+        "question": "Bir müşteri, beslenme hedeflerinde self-sabotage (kendini sabotaj) davranışları sergiliyor ve success-avoidant patterns gösteriyor. Hangi psikodinamik ve bilişsel müdahale underlying fears'ı (altta yatan korkular) ele almada en etkilidir?",
+        "options": [
+            "Fear identification, cognitive restructuring ve self-compassion work ile altta yatan inançları keşfetme",
+            "Sabotaj davranışlarını görmezden gelme ve sadece hedefe odaklanma stratejisi uygulama",
+            "Müşteriyi sabotaj için eleştirme ve daha sıkı kurallar koyma yaklaşımı",
+            "Başarıyı erteleme ve comfort zone'da kalma davranışını pekiştirme protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Self-sabotage, bilinçsiz altta yatan korkulardan kaynaklanabilir (başarı korkusu, değişim korkusu, identity threat). Müdahale: 1) Fear identification - 'Başarılı olursam ne olur?' sorusu, altta yatan inançları ortaya çıkarma (örn: 'sorumluluklarım artar', 'kimliğim değişir'), 2) Cognitive restructuring - irrational beliefs challenge etme, alternatif perspektifler, 3) Self-compassion - kendini sabotaj suçluluk yaratır, döngüyü sürdürür; self-compassion döngüyü kırar, 4) Identity work - yeni kimliğe alışma, değişimin güvenli olduğunu anlamak. B şıkkı altta yatan nedenleri ele almaz. C şıkkı suçluluk ve direnç yaratır. D şıkkı maladaptif davranışı pekiştirir."
+    },
+    {
+        "id": 72,
+        "category": "Beslenme Bilimi",
+        "question": "Bir müşteri, mitokondriyal biogenesis'i artırarak metabolic flexibility ve endurance capacity'yi optimize etmek istiyor. Hangi beslenme ve lifestyle stratejisi PGC-1α aktivasyonunu ve mitochondrial health'i en kapsamlı destekler?",
+        "options": [
+            "Periodic fasting, polyphenol-rich foods, omega-3 ve düzenli aerobic exercise kombinasyonu",
+            "Sürekli yüksek kalori alımı ve sedanter yaşam tarzı ile metabolik rahatlık",
+            "Yüksek basit şeker diyeti ve mitokondriyal stresörlerden tamamen kaçınma stratejisi",
+            "Sadece supplement kullanımı ve lifestyle faktörlerini görmezden gelme yaklaşımı"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Mitokondriyal biogenesis, PGC-1α (peroxisome proliferator-activated receptor gamma coactivator 1-alpha) tarafından düzenlenir. Optimizasyon: 1) Periodic fasting - hafif metabolik stres, AMPK aktivasyonu, PGC-1α upregulation, autophagy (hasarlı mitokondri temizliği), 2) Polifenoller (resveratrol, quercetin, EGCG) - SIRT1 aktivasyonu, PGC-1α upregulation, 3) Omega-3 - mitokondriyal membran fluiditesi, oksidatif fosforilasyon verimliliği, 4) Aerobic exercise - en güçlü PGC-1α aktivatörü, metabolic flexibility (yağ/karbonhidrat oksidasyonu). Hormesis prensibi: hafif stresörler adaptasyon yaratır. B şıkkı metabolic inflexibility. C şıkkı yüksek şeker mitokondriyal disfonksiyon. D şıkkı lifestyle faktörler kritiktir."
+    },
+    {
+        "id": 73,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir müşteri, beslenme davranış değişikliğinde vicarious learning (dolaylı öğrenme) yoluyla self-efficacy geliştirmek istiyor. Hangi Social Cognitive Theory stratejisi modeling'i (modelleme) en etkili şekilde kullanır?",
+        "options": [
+            "Benzer özelliklere sahip role models, mastery model progression ve coping model kullanımı",
+            "Sadece mükemmel, erişilmez modeller gösterme ve aspirational approach kullanma",
+            "Modelleri tamamen görmezden gelme ve sadece kişisel deneyime güvenme yaklaşımı",
+            "Başarısızlık örnekleri gösterme ve negatif vicarious experience yaratma stratejisi"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Vicarious learning (Bandura), başkalarını gözlemleyerek öğrenmedir ve self-efficacy'nin dört kaynağından biridir. Etkili modeling: 1) Benzer modeller - demografik, fiziksel, psikolojik benzerlik ('o başardıysa ben de başarabilirim'), 2) Mastery model progression - modelin zorluklarla nasıl başa çıktığını gösterme (sadece sonucu değil süreci), 3) Coping model vs. mastery model - coping model (zorluklarla mücadele ederek başarı) mastery model'den (kolayca başarı) daha etkilidir, daha ilişkilendirilebilir. 4) Multiple models - çeşitli modeller, evrensellik hissi. B şıkkı erişilmez modeller 'o farklı, ben yapamam' düşüncesi yaratır. C şıkkı vicarious learning'in faydasını kaçırır. D şıkkı negatif, self-efficacy azaltır."
+    },
+    {
+        "id": 74,
+        "category": "Beslenme Bilimi",
+        "question": "Bir müşteri, gut-liver axis (bağırsak-karaciğer aksı) optimizasyonu yoluyla metabolic endotoxemia'yı azaltmak ve insulin sensitivity'yi artırmak istiyor. Hangi beslenme stratejisi intestinal permeability'yi ve LPS translocation'ı en etkili şekilde modüle eder?",
+        "options": [
+            "Prebiyotik lif, probiyotikler, polifenoller ve omega-3 ile gut barrier integrity desteği",
+            "Yüksek doymuş yağ, düşük lif ve minimal probiyotik alımı stratejisi",
+            "Western diet pattern ve pro-inflamatuar besinler ile beslenme yaklaşımı uygulaması",
+            "Sadece antibiyotik kullanımı ve besinsel destek yapmama protokolü oluşturma"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Gut-liver axis: bağırsak disbiyozisi ve intestinal permeability artışı, LPS (lipopolisakkarit) translocation'a yol açar, portal venöz sistem üzerinden karaciğere ulaşır, metabolic endotoxemia ve sistemik inflamasyona neden olur. Optimizasyon: 1) Prebiyotik lif - SCFA üretimi (özellikle butirat), tight junction protein ekspresyonu, gut barrier integrity, 2) Probiyotikler - disbiyozisi düzeltir, mukus tabakasını güçlendirir, 3) Polifenoller - intestinal barrier fonksiyonu, mikrobiyota modülasyonu, 4) Omega-3 - anti-inflamatuar, gut barrier integrity. B şıkkı yüksek doymuş yağ LPS absorpsiyonunu artırır. C şıkkı Western diet disbiyozis ve permeability artırır. D şıkkı antibiyotik disbiyozis yaratır."
+    },
+    {
+        "id": 75,
+        "category": "Davranış Değişikliği",
+        "question": "Bir müşteri, beslenme davranışlarında intrinsic motivation'ı sürdürmekte zorlanıyor ve novelty effect (yenilik etkisi) kaybolunca motivasyon düşüyor. Hangi müdahale sustained intrinsic motivation ve interest maintenance'ı en etkili şekilde destekler?",
+        "options": [
+            "Optimal challenge level, autonomy support ve progress visibility ile flow state yaratma",
+            "Sürekli aynı rutini tekrar etme ve hiç değişiklik yapmama stratejisi",
+            "Dışsal ödülleri maksimize etme ve intrinsic motivation'ı görmezden gelme yaklaşımı",
+            "Çok kolay hedefler belirleme ve tüm zorluklardan kaçınma protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Intrinsic motivation, aktivitenin kendi iyiliği için yapılmasıdır. Novelty effect geçtikten sonra sürdürmek için: 1) Optimal challenge - flow theory (Csikszentmihalyi): beceri-zorluk dengesi, çok kolay sıkıcı, çok zor kaygı yaratır, 2) Autonomy support - seçim özgürlüğü, kendi kararlarını alma (SDT), 3) Progress visibility - küçük kazanımları görünür kılma, competence ihtiyacını karşılama, 4) Variety within structure - temel rutini korurken küçük varyasyonlar (yeni tarifler, farklı sebzeler), novelty'yi yeniden yaratma. B şıkkı monotonluk, boredom yaratır. C şıkkı dışsal ödüller intrinsic motivation'ı azaltabilir (overjustification effect). D şıkkı optimal challenge eksikliği, sıkıcı."
+    },
+    {
+        "id": 76,
+        "category": "Beslenme Bilimi",
+        "question": "Bir ultra-marathon atleti, exertional rhabdomyolysis (efor rabdomiyolizi) riskini azaltmak ve muscle membrane integrity'yi korumak istiyor. Hangi beslenme stratejisi oxidative stress ve muscle damage biomarkers'ı en etkili şekilde minimize eder?",
+        "options": [
+            "Antioksidan-rich foods, vitamin E, CoQ10 ve adequate hydration kombinasyonu stratejisi",
+            "Dehidrasyon durumunda egzersiz ve antioksidan alımından kaçınma yaklaşımı uygulaması",
+            "Yüksek protein yükleme ve sıvı kısıtlaması ile beslenme protokolü oluşturma",
+            "Sadece karbonhidrat alımı ve elektrolit-antioksidan görmezden gelme stratejisi"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Exertional rhabdomyolysis, yoğun egzersiz sonrası kas hücre membranı hasarı ve miyoglobin salınımıdır (CK, miyoglobin, aldolaz yükselir). Risk faktörleri: dehidrasyon, elektrolit dengesizliği, oksidatif stres. Önleme: 1) Antioksidanlar (C, E vitamini, polifenoller) - ROS (reactive oxygen species) azalır, membran lipid peroksidasyonu önlenir, 2) Vitamin E - membran stabilizasyonu, lipid peroksidasyonunu önler, 3) CoQ10 - mitokondriyal antioksidan, elektron transport chain verimliliği, 4) Adequate hydration ve elektrolit dengesi - kas hücre integritesi, miyoglobin böbrek hasarını önleme. B şıkkı dehidrasyon risk faktörüdür. C şıkkı sıvı kısıtlaması kontraendike. D şıkkı elektrolit ve antioksidan eksikliği risk artırır."
+    },
+    {
+        "id": 77,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir müşteri, beslenme davranış değişikliğinde cultural identity ve traditional food practices ile modern nutrition goals arasında conflict yaşıyor. Hangi culturally-sensitive coaching yaklaşımı en etkili resolution ve integration sağlar?",
+        "options": [
+            "Cultural humility practice, food tradition honoring ve adaptive modification stratejisi kombinasyonu",
+            "Tüm geleneksel besinlerden vazgeçme ve tamamen Batı diyetine geçiş zorlama",
+            "Kültürel pratikleri görmezden gelme ve sadece evidence-based approach uygulama metodu",
+            "Müşteriye kültürünün sağlıksız olduğunu söyleme ve değişim baskısı yapma"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Cultural competence ve cultural humility, etkili koçluk için kritiktir, özellikle diverse populations'da. Yaklaşım: 1) Cultural humility - kültürel pratiklere saygı, öğrenmeye açık olma, müşterinin expert olduğunu kabul etme, 2) Food tradition honoring - geleneksel besinlerin duygusal, sosyal, spiritual anlamını tanıma, 3) Adaptive modification - geleneksel yemekleri healthier versiyonlara dönüştürme (pişirme yöntemleri, porsiyon, ingredient substitution), 4) Integration - kültürel kimlik ve sağlık hedefleri çatışmak zorunda değil, coexist edebilirler. Bu yaklaşım, adherence ve satisfaction artırır. B ve D şıkları kültürel insensitivity, direnç yaratır. C şıkkı kültürel context'i ihmal eder."
+    },
+    {
+        "id": 78,
+        "category": "Beslenme Bilimi",
+        "question": "Bir tip 2 diyabetli müşteri, incretin-based therapy'ye benzer şekilde GLP-1 (glukagon-like peptide-1) salınımını beslenme yoluyla optimize etmek istiyor. Hangi makrobesin kompozisyonu ve besin seçimi endojen GLP-1 sekresyonunu en etkili şekilde stimüle eder?",
+        "options": [
+            "Fermente edilebilir lif, protein (özellikle whey), healthy fats ve bitter compounds kombinasyonu",
+            "Yüksek basit şeker, düşük lif ve minimal yağ alımı stratejisi",
+            "Sadece karbonhidrat bazlı beslenme ve protein-yağ kısıtlaması protokolü uygulaması",
+            "Düşük lif, yüksek işlenmiş gıda ve hızlı sindirim yaklaşımı"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: GLP-1, L-cells (distal ileum, kolon) tarafından salınır ve glukoz-dependent insulin secretion artırır, gastric emptying yavaşlatır, appetite azaltır. GLP-1 stimulation: 1) Fermente edilebilir lif - SCFA (özellikle butirat, propiyonat) L-cells'i stimüle eder, GLP-1 salınımı, 2) Protein (özellikle whey) - amino asitler (özellikle leucine) GLP-1 trigger eder, 3) Healthy fats - özellikle MUFA ve omega-3, GLP-1 salınımını destekler, 4) Bitter compounds (naringin, EGCG) - taste receptors (TAS2R) L-cells üzerinde GLP-1 salınımını trigger eder. Kombine yaklaşım sinerjiktir. B ve D şıkları basit şeker ve düşük lif, zayıf GLP-1 response. C şıkkı protein-yağ eksikliği GLP-1 stimulation azaltır."
+    },
+    {
+        "id": 79,
+        "category": "Davranış Değişikliği",
+        "question": "Bir müşteri, beslenme hedeflerinde sunk cost fallacy (batık maliyet yanılgısı) nedeniyle etkisiz stratejilere devam ediyor ve pivot yapmakta zorlanıyor. Hangi cognitive debiasing müdahalesi rational decision-making'i en etkili şekilde kolaylaştırır?",
+        "options": [
+            "Prospective thinking, cost-benefit re-analysis ve fresh perspective taking stratejisi kombinasyonu",
+            "Geçmiş yatırımları vurgulama ve değiştirmemenin önemini pekiştirme yaklaşımı uygulaması",
+            "Müşteriye vazgeçmenin başarısızlık olduğunu söyleme ve persistence zorlama metodu",
+            "Sunk costs'u görmezden gelme yerine daha fazla yatırım yapma protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Sunk cost fallacy, geçmiş yatırımlar nedeniyle (zaman, para, efor) etkisiz bir stratejiye devam etme eğilimidir. Rasyonel karar: sadece future costs/benefits değerlendirilmelidir. Debiasing: 1) Prospective thinking - 'geçmişi değiştiremem, gelecek kararlarım ne olmalı?' sorusu, forward-looking perspektif, 2) Cost-benefit re-analysis - mevcut stratejinin future costs vs. benefits, alternatif stratejilerin future costs vs. benefits, 3) Fresh perspective ('pre-mortem' technique) - 'eğer bu stratejiden şimdi başlasaydım, başlar mıydım?', 4) Reframing - stratejiden vazgeçme 'başarısızlık' değil, 'öğrenme ve adaptasyon'. B şıkkı fallacy'yi pekiştirir. C şıkkı esneklik ve adaptasyonu engelleyerek. D şıkkı escalation of commitment yaratır."
+    },
+    {
+        "id": 80,
+        "category": "Beslenme Bilimi",
+        "question": "Bir kadın sporcu, iron-deficiency anemia (demir eksikliği anemisi) olmadan iron-deficiency (serum ferritin <30 ng/mL) yaşıyor ve endurance performance düşüyor. Hangi demir repletion stratejisi hematological ve performance parametreleri en etkili şekilde restore eder?",
+        "options": [
+            "Oral demir (ferrous sulfate 100-200mg elemental/gün), C vitamini, heme-iron rich foods kombinasyonu",
+            "Sadece non-heme iron sources ve inhibitörlerle birlikte tüketim stratejisi",
+            "Düşük doz intermittent demir ve C vitamini almama yaklaşımı uygulaması",
+            "Demir takviyesi yapmama ve sadece dietary sources ile yetersiz alım"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Iron deficiency without anemia (IDNA), ferritin düşük ancak hemoglobin normal. Ancak, performance etkilenir çünkü demir mitokondriyal enzimler (cytochrome oxidase, succinate dehydrogenase) ve miyoglobin için gereklidir. Repletion: 1) Oral demir - ferrous sulfate, ferrous fumarate, ferrous gluconate (100-200mg elemental demir/gün), absorption ~10-30%, 2) C vitamini - demiri ferrous forma indirger, absorption artırır, 3) Heme-iron (et, balık, kümes hayvanı) - absorption ~15-35%, non-heme'den yüksek. Alternate-day dosing son araştırmalarda daha iyi absorpsiyon gösterir. GI side effects minimize etmek için yemeklerle alabilir. Ferritin target: >30 ng/mL (atletler için >50 tercih edilir). B şıkkı inhibitörler absorption azaltır. C şıkkı intermittent çok düşük doz yetersiz. D şıkkı dietary sources IDNA'yı restore etmek için genellikle yetersiz."
+    },
+    {
+        "id": 81,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir müşteri, beslenme davranış değişikliğinde social contagion (sosyal bulaşma) ve peer influence effects'e karşı koyabilmek için stratejiler geliştirmek istiyor. Hangi müdahale social influence resistance'ı en etkili şekilde güçlendirir?",
+        "options": [
+            "Implementation intentions for social situations, assertiveness training ve value affirmation kombinasyonu",
+            "Tüm sosyal durumlardan kaçınma ve izolasyon ile influence ortadan kaldırma",
+            "Peer pressure'a tamamen teslim olma ve uyum sağlama yaklaşımı benimseme",
+            "Sosyal etkinin olmadığını inkar etme ve farkındalık geliştirmeme protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Social contagion, davranışların sosyal ağlar içinde yayılmasıdır (obesity, eating behaviors). Peer influence resistance: 1) Implementation intentions for social contexts - 'arkadaşlarım fast food önerirse, sağlıklı alternatif önereceğim veya nazikçe reddedip kendi seçimimi yapacağım', 2) Assertiveness training - 'hayır' demeyi öğrenme, sınır koyma, sosyal baskıya karşı koyma becerileri, 3) Value affirmation - kişisel değerleri hatırlama ('sağlık benim için önemli'), identity reinforcement, 4) Supportive social networks - benzer hedeflere sahip kişilerle bağlantı kurma. Sosyal etki güçlüdür ancak yönetilebilir. B şıkkı izolasyon gerçekçi değildir ve mental health'e zarar verir. C şıkkı özerklik yok. D şıkkı farkındalık eksikliği vulnerability artırır."
+    },
+    {
+        "id": 82,
+        "category": "Beslenme Bilimi",
+        "question": "Bir yaşlı müşteri, age-related decline in protein digestion ve anabolic response'u optimize etmek için leucine threshold stratejisi uygulamak istiyor. Hangi amino asit profili ve dozaj yaşlanma ile ilişkili anabolic resistance'ı en etkili aşar?",
+        "options": [
+            "Yüksek lösin içeren protein (3-4g lösin/öğün) ve esansiyel amino asit desteği kombinasyonu",
+            "Düşük kaliteli protein ve minimal lösin içeriği ile beslenme stratejisi",
+            "Sadece non-essential amino acid alımı ve esansiyel amino asitlerden kaçınma",
+            "Protein alımı yapmama ve sadece karbonhidrat bazlı beslenme protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Yaşlanma ile anabolic resistance gelişir - muscle protein synthesis (MPS) threshold yükselir. Gençlerde 20-25g protein, yaşlılarda 35-40g protein gereklidir. Optimizasyon: 1) Yüksek lösin içeriği - lösin mTORC1'in en güçlü aktivatörüdür, threshold ~3-4g lösin/öğün yaşlılarda, 2) Yüksek kaliteli protein - whey, yumurta, et (yüksek DIAAS, hızlı sindirim, yüksek EAA), 3) Essential amino acid (EAA) supplementation - özellikle EAA mixture lösin açısından zengin (~40% lösin), MPS'yi stimüle eder. Whey protein idealdir: hızlı sindirim, yüksek lösin (~10-12%), yüksek EAA. B şıkkı düşük kalite insufficient MPS. C şıkkı EAA kritiktir, NEAA yetersiz. D şıkkı protein eksikliği sarkopeniye yol açar."
+    },
+    {
+        "id": 83,
+        "category": "Davranış Değişikliği",
+        "question": "Bir müşteri, beslenme davranışlarında affective forecasting errors (duygulanım öngörüsü hataları) yapıyor ve hedonic adaptation'ı (hedonik adaptasyon) underestimate ediyor. Hangi müdahale realistic emotional expectation'lar oluşturmada en etkilidir?",
+        "options": [
+            "Affective forecasting education, reference point adjustment ve gratitude practice kombinasyonu stratejisi",
+            "Müşteriye hedef başarıldıktan sonra mutluluğun sonsuza kadar süreceğini söyleme yaklaşımı",
+            "Hedonic treadmill'i görmezden gelme ve sürekli yeni hedefler koyma protokolü",
+            "Emotional expectations yaratmama ve tamamen rasyonel yaklaşım benimseme metodu"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Affective forecasting (Daniel Gilbert), gelecekteki duygusal durumları tahmin etmektir. İnsanlar genellikle: 1) Impact bias - duyguların yoğunluğunu ve süresini abartma ('5 kilo verirsem sürekli mutlu olacağım'), 2) Hedonic adaptation - yeni duruma alışma, mutluluk bazal seviyeye döner. Müdahale: 1) Education - hedonic adaptation normal, sürekli mutluluk gerçekçi değil, 2) Reference point adjustment - küçük kazanımları takdir etme, 3) Gratitude practice - hedonic adaptation'ı yavaşlatır, appreciation sürdürür, 4) Process-oriented happiness - outcome'dan ziyade süreçten tatmin alma. B şıkkı gerçekçi değildir, hayal kırıklığı yaratır. C şıkkı hedonic treadmill - sürekli yeni hedefler, hiç tatmin olma yok. D şıkkı duygular önemlidir, tamamen rasyonel olmak mümkün değildir."
+    },
+    {
+        "id": 84,
+        "category": "Beslenme Bilimi",
+        "question": "Bir sporcu, heat acclimation (sıcağa alışma) sırasında thermoregulation ve plasma volume expansion'ı optimize etmek istiyor. Hangi hydration ve elektrolit stratejisi cardiovascular drift'i minimize ederek heat adaptation'ı en etkili destekler?",
+        "options": [
+            "Hyperhydration, sodyum yükleme (500mg Na/saat), protein alımı ve gradual heat exposure kombinasyonu",
+            "Dehidrasyon stratejisi ve minimal sodyum alımı ile adaptasyon zorlama yaklaşımı",
+            "Sadece su tüketimi ve elektrolit alımından kaçınma protokolü uygulaması",
+            "Ani yüksek sıcaklık exposure ve sıvı kısıtlaması ile hızlı adaptasyon"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Heat acclimation, termoregülatör sistemin adaptasyonudur (terleme başlangıcı erken, terleme oranı artar, ter elektrolit konsantrasyonu azalır, plasma volume expansion). Optimizasyon: 1) Hyperhydration - başlangıç plasma volume yüksek, cardiovascular strain azalır, 2) Sodyum yükleme - plazma volume expansion destekler (~500mg Na/saat egzersiz sırasında veya 3-5g/gün toplam), aldosterone-mediated renal sodium retention, 3) Protein - albumin sentezi, plasma volume expansion (onkotik basınç), 4) Gradual exposure - 7-14 gün, günde 60-90 dakika. Plasma volume %10-20 artar. B ve D şıkları dehidrasyon heat illness riskini artırır. C şıkkı elektrolit eksikliği hyponatremia riski."
+    },
+    {
+        "id": 85,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir müşteri, beslenme davranış değişikliğinde moral licensing effect (ahlaki lisanslama etkisi) nedeniyle sağlıklı davranıştan sonra sağlıksız davranışlar sergiliyor. Hangi müdahale compensatory behaviors'ı (telafi edici davranışlar) en etkili şekilde azaltır?",
+        "options": [
+            "Value-based framing, consistency focus ve self-perception theory application kombinasyonu yaklaşımı",
+            "Müşteriye ödül olarak sağlıksız besinler yeme hakkı verme stratejisi",
+            "Moral licensing'i pekiştirme ve 'hak ettin' mesajı verme yaklaşımı",
+            "Davranışları ayrı kategorilere koyma ve mental accounting teşvik etme protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Moral licensing, 'iyi' davranış sonrası 'kötü' davranışı kendine izin verme eğilimidir (örn: 'sabah sağlıklı kahvaltı yaptım, öğle fast food yiyebilirim'). Müdahale: 1) Value-based framing - davranışları 'ödül-ceza' yerine 'değerlerime uygun-uygun değil' olarak frame etme, 2) Consistency focus - 'ben sağlıklı yiyen bir insanım' identity reinforcement, tutarlılık vurgulama, 3) Self-perception theory (Bem) - davranışlar kimliği yansıtır, her davranış kimliği güçlendirir veya zayıflatır, 4) Progress-as-commitment framing vs. progress-as-license. B şıkkı licensing'i pekiştirir, ödül sistemi problematik. C şıkkı moral licensing'i doğrular. D şıkkı mental accounting licensing'i kolaylaştırır (separate 'accounts' yaratır)."
+    },
+    {
+        "id": 86,
+        "category": "Beslenme Bilimi",
+        "question": "Bir müşteri, advanced glycation end products (AGEs) akümülasyonunu azaltarak cellular aging ve chronic disease riskini minimize etmek istiyor. Hangi beslenme ve pişirme stratejisi dietary AGE exposure'ı en etkili şekilde azaltır?",
+        "options": [
+            "Düşük ısı pişirme (buharda, haşlama, sous vide), asidik marinasyon ve antioksidan-rich foods kombinasyonu",
+            "Yüksek ısı kuru pişirme (kızartma, ızgara, fırın 200+°C) ve uzun süre stratejisi",
+            "Karamelizasyon ve Maillard reaction'ı maksimize etme ile lezzet optimizasyonu yaklaşımı",
+            "İşlenmiş gıdalar ve yüksek AGE içerikli besinler ile beslenme protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: AGEs (advanced glycation end products), protein/lipidlerin şekerlerle non-enzimatik reaksiyonundan oluşur (Maillard reaction). Dietary AGEs, endojen AGE pool'una katkıda bulunur, oksidatif stres, inflamasyon, RAGE receptor aktivasyonu yoluyla aging ve kronik hastalıklara (diabetes komplikasyonları, CVD, Alzheimer) katkıda bulunur. Azaltma: 1) Düşük ısı, nemli pişirme - buharda, haşlama, sous vide (<100°C), pressure cooking, AGE formasyonu minimal, 2) Asidik marinasyon - limon, sirke pH düşürür, AGE formasyonunu ~50% azaltır, 3) Antioksidanlar - sebze, meyve, baharat (curcumin, EGCG) AGE formasyonunu inhibe eder. B şıkkı yüksek ısı maksimum AGE formasyonu. C şıkkı lezzet için AGE artışı. D şıkkı işlenmiş gıdalar yüksek AGE içerir."
+    },
+    {
+        "id": 87,
+        "category": "Davranış Değişikliği",
+        "question": "Bir müşteri, beslenme hedeflerinde present bias (şimdiki zaman yanlılığı) ve hyperbolic discounting nedeniyle immediate gratification'ı tercih ediyor. Hangi intertemporal choice müdahalesi future orientation'ı en etkili şekilde artırır?",
+        "options": [
+            "Commitment devices, temptation bundling ve episodic future thinking kombinasyonu stratejisi uygulaması",
+            "Sadece şimdiyi düşünme ve gelecek planlamasından tamamen vazgeçme yaklaşımı",
+            "İmpulsif kararları teşvik etme ve anlık tatmin maksimizasyonu protokolü oluşturma",
+            "Uzak gelecekteki hedefleri görmezden gelme ve sadece bugüne odaklanma"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Present bias (O'Donoghue & Rabin), insanların şimdiki ödüllere orantısız değer vermesidir. Hyperbolic discounting, uzak gelecekteki ödüller exponential'den daha hızlı discount edilir. Müdahale: 1) Commitment devices (Thaler) - gelecek benlik adına şimdiki benlik karar alır (örn: sağlıksız besinleri eve getirmeme, meal prep advance), 2) Temptation bundling (Milkman) - instant gratification ile delayed gratification'ı birleştirme (sevdiğin podcast sadece gym'deyken), 3) Episodic future thinking - gelecek benliği vivid hayal etme, psychological distance azaltma, 4) Precommitment - ön taahhütler, future choice architecture. B, C, D şıkları present bias'ı pekiştirir, uzun vadeli hedefleri ihmal eder."
+    },
+    {
+        "id": 88,
+        "category": "Beslenme Bilimi",
+        "question": "Bir sporcu, muscle glycogen supercompensation (kas glikojen süper-kompanzasyonu) protokolü uygulamak ve endurance race performance'ını maximize etmek istiyor. Hangi periodization stratejisi en yüksek muscle glycogen storage'ı sağlar?",
+        "options": [
+            "Glycogen depletion (düşük CHO + yüksek antrenman), ardından taper + CHO loading (10-12 g/kg) stratejisi",
+            "Sürekli yüksek karbonhidrat diyeti ve antrenman volümü değişikliği yapmama yaklaşımı",
+            "Ketojenik diyet sürdürme ve karbonhidrat yüklemesi yapmama protokolü uygulaması",
+            "Yarıştan 1 gün önce orta düzey karbonhidrat ve yüksek yoğunluklu antrenman"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Glycogen supercompensation, klasik 'carb-loading' modern versiyonu. Fizyoloji: glycogen depletion sonrası, glycogen synthase aktivitesi artar, refeed sırasında normal seviyelerden daha fazla glikojen depolanır. Modern protokol: 1) Depletion phase (3-4 gün) - düşük CHO (~3 g/kg) + yüksek antrenman volümü, glycogen depletes, 2) Taper phase - antrenman volümü azaltma, 3) Loading phase (2-3 gün) - yüksek CHO (10-12 g/kg), düşük lif, glycogen storage 200-250 mmol/kg muscle'a ulaşır (normal ~100-120). Su tutulması artar (glycogen her gram 3-4 g su bind eder). B şıkkı sürekli yüksek CHO supercompensation yaratmaz. C şıkkı ketojenik diyet glikojen depletes, yarış performansı yüksek yoğunlukta düşer. D şıkkı 1 gün yetersiz, yüksek yoğunluklu antrenman taper'a aykırı."
+    },
+    {
+        "id": 89,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir müşteri, beslenme davranış değişikliğinde growth mindset (gelişim zihniyeti) vs. fixed mindset (sabit zihniyet) ayrımını anlamak ve setbacks'leri constructive şekilde yorumlamak istiyor. Hangi mindset intervention en etkili resilience ve learning orientation yaratır?",
+        "options": [
+            "Neuroplasticity education, effort attribution ve 'not yet' language kullanımı kombinasyonu yaklaşımı",
+            "Yeteneklerin sabit olduğunu vurgulama ve genetik determinizm mesajı verme stratejisi",
+            "Başarısızlıkları kişisel yetersizlik olarak frame etme ve sabit etiketler kullanma yaklaşımı",
+            "Sadece doğal yetenek övgüsü ve çaba görmezden gelme protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Growth mindset (Carol Dweck), yeteneklerin ve zekanın geliştirilebileceği inancıdır vs. fixed mindset (sabit, değişmez). Growth mindset: resilience, setback'leri öğrenme fırsatı olarak görme, effort değerlendirme. Müdahale: 1) Neuroplasticity education - beynin değişebilir olduğu bilgisi, 'brain is like a muscle', 2) Effort attribution - başarıyı effort, strategi, practice'e atfetme (yetenek değil), 3) 'Not yet' language - 'başaramadım' → 'henüz başaramadım', process ve progression vurgulama, 4) Challenges as opportunities - zorlukları growth fırsatı olarak reframe etme. B ve C şıkları fixed mindset pekiştirir, learned helplessness. D şıkkı talent praise effort'u devalue eder, fixed mindset yaratır (Dweck araştırmaları)."
+    },
+    {
+        "id": 90,
+        "category": "Beslenme Bilimi",
+        "question": "Bir müşteri, sulforaphane ve diğer isothiocyanates yoluyla Nrf2 (nuclear factor erythroid 2-related factor 2) pathway'i aktive ederek cellular detoxification'ı optimize etmek istiyor. Hangi besin hazırlama stratejisi myrosinase aktivitesi ve bioavailability'yi en etkili artırır?",
+        "options": [
+            "Çiğ veya hafif buharda pişirme, çiğneme/parçalama ve myrosinase-rich foods ekleme kombinasyonu",
+            "Yüksek ısıda uzun süre kaynatma ve myrosinase enzimi denatüre etme stratejisi",
+            "Mikrodalga ile pişirme ve hızlı yüksek ısı uygulaması protokolü yaklaşımı",
+            "Sadece pişmiş cruciferous sebze tüketimi ve çiğ tüketimden kaçınma"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Cruciferous sebzeler (brokoli, lahana, brüksel lahanası) glucosinolates içerir. Myrosinase enzimi (plant enzyme) glucosinolates'i isothiocyanates'e (sulforaphane, etc.) dönüştürür. Isothiocyanates Nrf2 aktivasyonu yapar → antioxidant response element (ARE) → phase II detoxification enzim ekspresyonu. Optimizasyon: 1) Çiğ veya hafif buhar (<5 dakika) - myrosinase heat-sensitive, uzun pişirme inaktive eder, 2) Çiğneme/parçalama - hücre duvarı kırılır, glucosinolates ve myrosinase temas eder, 3) Myrosinase-rich foods - hardal tozu, wasabi, roka eklemek (gut microbiota da myrosinase üretir ama daha az etkili). Sulforaphane bioavailability en yüksek çiğ/hafif pişmişte. B ve C şıkları myrosinase inaktivasyonu, düşük bioavailability. D şıkkı pişmiş sebze myrosinase azalır."
+    },
+    {
+        "id": 91,
+        "category": "Davranış Değişikliği",
+        "question": "Bir müşteri, beslenme davranışlarında action-inaction inertia (eylem-eylemsizlik ataleti) yaşıyor ve initial failure sonrası hiç eylem almamayı tercih ediyor. Hangi müdahale inaction inertia'yı kırmada ve renewed action'ı en etkili şekilde tetikler?",
+        "options": [
+            "Fresh start effect kullanma, goal resetting ve minimal viable action stratejisi kombinasyonu",
+            "İlk başarısızlıktan sonra tamamen vazgeçme ve hiç tekrar denememe yaklaşımı",
+            "Mükemmel koşulları bekleme ve action'ı sürekli erteleme protokolü uygulaması",
+            "Geçmiş başarısızlığı sürekli hatırlama ve olumsuz rumination yapma stratejisi"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Action-inaction inertia (Tykocinski), bir fırsatı kaçırdıktan sonra benzer fırsatlarda action almama eğilimidir ('ilk denemem başarısız oldu, tekrar denemeye değmez'). Müdahale: 1) Fresh start effect (Dai et al.) - temporal landmarks (yeni yıl, pazartesi, doğum günü) mental accounting reset yapar, 'temiz sayfa' hissi, 2) Goal resetting - hedefleri yeniden değerlendirme, daha achievable hale getirme, 3) Minimal viable action - en küçük adımla başlama, momentum yaratma, 4) Reframing - başarısızlık 'bilgi toplama' olarak görme, iteration süreci. B şıkkı inertia'yı pekiştirir. C şıkkı procrastination, mükemmeliyetçilik, action hiç olmaz. D şıkkı negative rumination motivasyonu yok eder."
+    },
+    {
+        "id": 92,
+        "category": "Beslenme Bilimi",
+        "question": "Bir sporcu, branched-chain amino acids (BCAA) suplementasyonunun central fatigue hypothesis üzerindeki etkisini optimize etmek ve mental performance'ı korumak istiyor. Hangi BCAA timing ve dosaj stratejisi serotonin-induced fatigue'i en etkili şekilde azaltır?",
+        "options": [
+            "BCAA 5-20g egzersiz sırasında, yüksek BCAA:tryptophan ratio ve karbonhidrat kombinasyonu",
+            "Sadece triptofan takviyesi ve BCAA almama stratejisi uygulama yaklaşımı",
+            "Egzersiz sonrası BCAA alımı ve timing görmezden gelme protokolü uygulaması",
+            "Düşük doz BCAA (<2g) ve yüksek triptofan alımı kombinasyonu"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Central fatigue hypothesis (Newsholme): uzun dayanıklılık egzersizinde BCAA seviyeleri düşer (enerji için okside edilir), triptofan:BCAA ratio artar, triptofan blood-brain barrier'ı geçer (BCAA ile compete eder), beyin serotonin sentezi artar, lethargy ve perceived exertion artar. BCAA suplementasyonu: 1) BCAA 5-20g (lösin:izolösin:valin = 2:1:1), egzersiz sırasında veya önce, 2) Yüksek BCAA:tryptophan ratio - triptofan brain uptake'ini azaltır, 3) Karbonhidrat ile - insülin triptofan'ı kas dokusuna yönlendirir. Kanıtlar mixed: bazı çalışmalar mental performance korunması gösterir, bazıları minimal etki. En tutarlı etki uzun (>2 saat) endurance'ta. B şıkkı triptofan brain serotonin artırır, fatigue. C şıkkı timing suboptimal. D şıkkı düşük BCAA yetersiz."
+    },
+    {
+        "id": 93,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir müşteri, beslenme davranış değişikliğinde paradox of choice (seçim paradoksu) nedeniyle decision paralysis yaşıyor ve çok fazla seçenek motivation'ı azaltıyor. Hangi choice architecture müdahalesi optimal choice set design'ı en etkili sağlar?",
+        "options": [
+            "Choice limitation, categorization ve default options ile cognitive load azaltma kombinasyonu",
+            "Sınırsız seçenek sunma ve müşteriyi tüm olasılıkları değerlendirmeye zorlama yaklaşımı",
+            "Hiç seçenek sunmama ve tamamen direktif yaklaşım benimseme stratejisi protokolü",
+            "Karmaşık menüler ve detaylı analiz gerektiren kararlar ile zorluk artırma"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Paradox of choice (Barry Schwartz), çok fazla seçenek paradoksal olarak satisfaction'ı azaltır, decision fatigue, analysis paralysis, regret yaratır. Choice architecture (Thaler & Sunstein): 1) Choice limitation - seçenekleri 3-5'e sınırlama (jam study: 6 seçenek > 24 seçenek satış), 2) Categorization - seçenekleri kategorilere ayırma, karar ağacını basitleştirme, 3) Default options - önerilen seçenek belirleme (opt-out yerine opt-in), 4) Progressive disclosure - bilgiyi aşamalı sunma. Örnek: '3 kahvaltı seçeneği', 'haftalık 3 tarif', simplified meal planning. B şıkkı choice overload. C şıkkı özerklik yok, direnç. D şıkkı cognitive overload, decision paralysis."
+    },
+    {
+        "id": 94,
+        "category": "Beslenme Bilimi",
+        "question": "Bir müşteri, mTOR (mammalian target of rapamycin) ve AMPK (AMP-activated protein kinase) pathway'lerini beslenme yoluyla balance ederek longevity ve metabolic health optimize etmek istiyor. Hangi nutrient periodization stratejisi anabolism-catabolism dengesini en etkili modüle eder?",
+        "options": [
+            "Periodic fasting, leucine pulse feeding ve caloric cycling ile mTOR-AMPK oscillation yaratma",
+            "Sürekli yüksek kalori ve protein ile mTOR constant activation stratejisi",
+            "Kronik kalori kısıtlaması ve muscle loss ile AMPK sürekli aktivasyon yaklaşımı",
+            "Nutrient timing görmezden gelme ve random feeding pattern uygulama protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: mTOR ve AMPK antagonistic pathways: mTOR (anabolic, growth, protein synthesis, nutrient sensing - amino acids, insulin, growth factors) vs. AMPK (catabolic, energy sensing, low ATP → AMPK activation → autophagy, mitochondrial biogenesis, fatty acid oxidation). Longevity: sürekli mTOR aktivasyon aging ile ilişkili, ancak muscle mass için mTOR gerekli. Optimal: oscillation (pulse aktivasyon). Strateji: 1) Periodic fasting (16:8, 5:2) - AMPK aktivasyon, autophagy, metabolic flexibility, 2) Leucine pulse feeding - öğünlerde yüksek lösin → mTOR spike, fasting'de mTOR düşük, 3) Caloric cycling - yüksek kalori günler (anabolic) vs. düşük kalori günler (catabolic), hormesis. B şıkkı sürekli mTOR aging riski. C şıkkı kronik kısıtlama muscle loss. D şıkkı random pattern optimize etmez."
+    },
+    {
+        "id": 95,
+        "category": "Davranış Değişikliği",
+        "question": "Bir müşteri, beslenme hedeflerinde construal level mismatch yaşıyor ve abstract goals'ı concrete actions'a dönüştürmekte zorlanıyor. Hangi goal concreteness intervention implementation gap'i en etkili şekilde kapatır?",
+        "options": [
+            "SMART goals, implementation intentions ve mental contrasting ile abstract-to-concrete translation kombinasyonu",
+            "Sadece abstract, high-level goals belirleme ve detayları görmezden gelme",
+            "Concrete planning yapmama ve spontane action bekleme yaklaşımı uygulama",
+            "Genel niyetler bildirme ve spesifik eylem planları oluşturmama protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Construal Level Theory: psychological distance artıkça düşünce daha abstract olur (high-level construal: 'sağlıklı olmak istiyorum'). Ancak davranış değişikliği concrete planning gerektirir. Implementation gap: abstract goal ile concrete action arasındaki boşluk. Müdahale: 1) SMART goals - abstract'tan concrete'e: 'Sağlıklı olmak' → 'Haftada 4 gün, sabah 7'de, 30 dakika yürüyüş', 2) Implementation intentions - if-then plans, spesifik tetikleyici ve eylem, 3) Mental contrasting (WOOP) - abstract ideal ile concrete obstacles'ı karşılaştırma, plan yapma. Bu teknikler goal-action gap'i kapatır. B şıkkı abstract hedefler implementation yaratmaz. C şıkkı planning eksikliği action almama. D şıkkı genel niyetler implementation'a dönüşmez."
+    },
+    {
+        "id": 96,
+        "category": "Beslenme Bilimi",
+        "question": "Bir kadın sporcu, luteal phase'de (menstrüel siklusun ikinci yarısı) artan core body temperature ve progesterone'un ergogenic ve ergolytic effects'ini yönetmek istiyor. Hangi beslenme ve cooling stratejisi thermoregulatory strain'i en etkili azaltır?",
+        "options": [
+            "Pre-cooling, increased fluid intake, electrolyte optimization ve CHO availability artırma kombinasyonu",
+            "Dehidrasyon stratejisi ve minimal sıvı alımı ile adaptasyon zorlama yaklaşımı",
+            "Yüksek protein, düşük karbonhidrat ve sıvı kısıtlaması protokolü uygulaması",
+            "Thermal stress ignorance ve normal antrenman rutinine devam etme stratejisi"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Luteal phase: progesteron yükselir, core body temperature ~0.3-0.5°C artar (basal body temperature shift), terleme başlangıç threshold yükselir, thermoregulatory strain artar, özellikle hot conditions'ta. Performance etkileri minimal-orta (bireysel varyasyon yüksek). Optimizasyon: 1) Pre-cooling - ice vest, cold drink, core temperature düşürme, thermal capacity artırma, 2) Increased fluid intake - yüksek terleme oranı nedeniyle, euhydration kritik, 3) Elektrolit optimizasyon - sodyum, potasyum, fluid balance, 4) CHO availability - progesteron protein katabolizmasını artırır, CHO sparing azalır, exogenous CHO yardımcı. B ve C şıkları dehidrasyon thermoregulatory strain artırır. D şıkkı bireysel adjustment yapılmaz, performance suboptimal."
+    },
+    {
+        "id": 97,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir müşteri, beslenme davranışlarında self-compassion (öz-şefkat) geliştirmek ve self-criticism'in (öz-eleştiri) olumsuz etkilerini azaltmak istiyor. Hangi Kristin Neff'in self-compassion framework elementi en kapsamlı psychological wellbeing yaratır?",
+        "options": [
+            "Self-kindness, common humanity ve mindful awareness üçlü kombinasyonu uygulama stratejisi",
+            "Sürekli self-judgment ve yüksek standartlar ile mükemmeliyetçilik pekiştirme yaklaşımı",
+            "Hataları büyütme ve kendini izole etme ile öz-eleştiri artırma protokolü",
+            "Over-identification ile hatalarla özdeşleşme ve rumination yapma stratejisi"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Self-compassion (Kristin Neff), zorluklarda kendine nazik davranmadır. Üç element: 1) Self-kindness vs. self-judgment - hatalar karşısında kendine nazik, destekleyici konuşma ('bu zor, ama üstesinden gelebilirim'), öz-eleştiri yerine, 2) Common humanity vs. isolation - herkes hata yapar, yalnız değilsin ('bu insan deneyiminin parçası'), izolasyon yerine, 3) Mindfulness vs. over-identification - duygularla dengeli ilişki, bastırmama ama aşırı özdeşleşmeme, rumination yerine. Self-compassion, self-esteem'den daha stable, shame ve anxiety azaltır, resilience artırır. Eating behavior'da: slip vs. relapse ayrımı, self-compassion relapse'i önler. B, C, D şıkları self-compassion'un tersi (self-criticism, isolation, over-identification), psikolojik wellbeing azaltır."
+    },
+    {
+        "id": 98,
+        "category": "Beslenme Bilimi",
+        "question": "Bir vegan sporcu, taurine eksikliği riskini azaltmak ve cardiovascular, neurological ve antioxidant functions'ı optimize etmek istiyor. Hangi strateji endojen taurine synthesis ve exogenous intake'i en etkili şekilde destekler?",
+        "options": [
+            "Cysteine ve methionine-rich plant foods, B6 vitamini ve direct taurine supplementation kombinasyonu",
+            "Düşük sülfür amino asit alımı ve taurine sentezinden tamamen vazgeçme",
+            "Sadece hayvansal ürün tüketimi ve bitkisel kaynakları görmezden gelme yaklaşımı",
+            "Taurine ihtiyacı olmadığını varsayma ve hiç destek almama protokolü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Taurine, sülfürlü amino asittir ancak protein sentezinde kullanılmaz. Fonksiyonlar: osmoregülasyon, membrane stabilization, calcium homeostasis, antioxidant, bile acid conjugation, kardiyovasküler ve nörolojik fonksiyon. Hayvansal kaynaklarda bol (et, balık, süt), bitkilerde yok. Vegan/vegetaryanlarda serum taurine düşük. Endojen sentez: cysteine → cysteine sulfinic acid → taurine (cysteinesulfinic acid decarboxylase, B6 kofaktör). Optimizasyon: 1) Cysteine/methionine-rich plant foods - soya, tofu, quinoa, ayçiçeği tohumu, 2) B6 vitamini - sentez için gerekli kofaktör, 3) Direct taurine supplementation (500-2000mg/gün) - vegan kaynaklarda yok, suplement gerekebilir, özellikle atletlerde. B şıkkı sülfür AA yetersiz sentez azalır. C şıkkı vegan değil. D şıkkı veganlar taurine riski taşır."
+    },
+    {
+        "id": 99,
+        "category": "Davranış Değişikliği",
+        "question": "Bir müşteri, beslenme hedeflerinde goal shielding (hedef kalkanı) eksikliği nedeniyle distractions ve competing goals tarafından kolayca yönlendiriliyor. Hangi goal management stratejisi focal goal protection'ı en etkili şekilde güçlendirir?",
+        "options": [
+            "Goal prioritization, distraction inhibition ve single-tasking practice kombinasyonu uygulama stratejisi",
+            "Çoklu goal simultane pursuit ve sürekli multitasking yaklaşımı benimseme protokolü",
+            "Tüm hedeflere eşit öncelik verme ve odaklanma yapmama yaklaşımı",
+            "Distractions'ı kucaklama ve goal-irrelevant cues'lara açık olma stratejisi"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Goal shielding (Shah et al.), focal goal'e odaklanırken competing goals ve distractions'ı aktif olarak inhibe etmedir. Zayıf goal shielding: kolayca distract olma, goal pursuit başarısızlığı. Müdahale: 1) Goal prioritization - açık hiyerarşi, 'beslenme hedefim bu hafta #1 öncelik', 2) Distraction inhibition training - competing stimuli'yi aktif olarak ignore etme pratiği, 3) Single-tasking practice - one thing at a time, multitasking goal shielding'i zayıflatır, 4) Implementation intentions - 'eğer distraction olursa, geri focal goal'e döneceğim'. Prefrontal cortex executive function ile ilişkili. B şıkkı multitasking goal dilution. C şıkkı prioritization yok, hiçbir goal optimize edilmez. D şıkkı distractions goal pursuit'i engelleyerek."
+    },
+    {
+        "id": 100,
+        "category": "Beslenme Bilimi",
+        "question": "Bir müşteri, telomere length preservation ve cellular senescence'i geciktirmek için beslenme stratejisi arıyor. Hangi nutrient ve lifestyle kombinasyonu telomerase activity ve oxidative stress management'ı en kapsamlı optimize eder?",
+        "options": [
+            "Mediterranean diet pattern, omega-3, antioxidants, caloric moderation ve stress management kombinasyonu",
+            "Yüksek işlenmiş gıda, trans yağlar, yüksek şeker ve kronik stres",
+            "Ekstrem kalori kısıtlaması ve mikro besin eksiklikleri ile aging hızlandırma",
+            "Sadece supplement kullanımı ve lifestyle faktörlerini görmezden gelme yaklaşımı"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Telomerler, kromozom uçlarında koruyucu DNA sekanslarıdır, her hücre bölünmesinde kısalır. Kritik kısalıkta cellular senescence veya apoptosis. Telomerase, telomerleri uzatabilir (çoğu somatik hücrede düşük/yok). Uzunluk preservation: 1) Mediterranean diet - anti-inflamatuar, antioksidan zengin, telomere length ile pozitif ilişki, 2) Omega-3 (EPA/DHA) - anti-inflamatuar, oksidatif stresi azaltır, telomere attrition yavaşlatır, 3) Antioksidanlar (C, E, polifenoller) - oksidatif DNA damage azaltır, 4) Caloric moderation - chronic caloric excess inflamasyon ve telomere shortening, 5) Stress management (meditasyon) - kronik stres kortizol ve oksidatif stres artırır, telomere shortening. Blackburn ve Epel araştırmaları. B şıkkı pro-inflamatuar, telomere shortening. C şıkkı ekstrem kısıtlama malnutrition. D şıkkı lifestyle factors kritik, supplement tek başına yetersiz."
+    }]; 
+    // ==============================================================
+
+    let currentQuestionIndex = 0;
+    let userAnswers = [];
+    let userUnsure = []; // Emin değilim durumlarını tutar
+    let timeLeft = 90 * 60; 
+    let timerInterval;
+    let isExamFinished = false;
+    let isReviewMode = false;
+    let reviewIndices = []; // İnceleme modunda gösterilecek soru indeksleri
+    let reviewIndex = 0; 
+
+    window.onload = function() {
+        if(examQuestions.length === 0) {
+            document.getElementById('question-text').innerText = "Lütfen soru verilerini koda ekleyin!";
+            return;
+        }
+        userAnswers = new Array(examQuestions.length).fill(null);
+        userUnsure = new Array(examQuestions.length).fill(false);
+        updateUI(); 
+        startTimer(); 
+    };
+
+    function startTimer() {
+        timerInterval = setInterval(() => {
+            if (timeLeft <= 0) { finishExam(); return; }
+            timeLeft--;
+            let m = Math.floor(timeLeft / 60);
+            let s = timeLeft % 60;
+            document.getElementById('timer').innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
+            if(timeLeft < 300) document.getElementById('timer').style.color = '#e74c3c';
+        }, 1000);
+    }
+
+    function toggleUnsure() {
+        if (isExamFinished || isReviewMode) return;
+        let qIndex = currentQuestionIndex;
+        userUnsure[qIndex] = !userUnsure[qIndex];
+        updateUnsureUI();
+    }
+
+    function updateUnsureUI() {
+        const btn = document.getElementById('unsure-btn');
+        let qIndex = isReviewMode ? reviewIndices[reviewIndex] : currentQuestionIndex;
+        
+        if (userUnsure[qIndex]) btn.classList.add('active');
+        else btn.classList.remove('active');
+    }
+
+    function updateUI() {
+        let qIndex = isReviewMode ? reviewIndices[reviewIndex] : currentQuestionIndex;
+        let qData = examQuestions[qIndex];
+        
+        // Başlık ve Mod Ayarları
+        if (isReviewMode) {
+            document.getElementById('q-number').innerText = `İnceleme ${reviewIndex + 1} / ${reviewIndices.length}`;
+            document.getElementById('review-badge').style.display = 'inline-block';
+            document.getElementById('timer').style.visibility = 'hidden';
+            
+            // Neden İncelemede? (Yanlış mı yaptı yoksa Emin mi değildi?)
+            const reasonBadge = document.getElementById('review-reason-badge');
+            reasonBadge.style.display = 'inline-block';
+            
+            const isCorrect = userAnswers[qIndex] === qData.correct;
+            const isUnsure = userUnsure[qIndex];
+
+            if (!isCorrect) {
+                reasonBadge.innerText = "DURUM: YANLIŞ CEVAP";
+                reasonBadge.style.background = "#f8d7da";
+                reasonBadge.style.color = "#721c24";
+            } else if (isCorrect && isUnsure) {
+                reasonBadge.innerText = "DURUM: DOĞRU AMA EMİN DEĞİLSİN";
+                reasonBadge.style.background = "#e8daef"; // Morumsu
+                reasonBadge.style.color = "#6c3483";
+            }
+
+            // İnceleme modunda "Emin değilim" butonu tıklanamaz ama durumu gösterir
+            document.getElementById('unsure-btn').style.pointerEvents = 'none';
+            document.getElementById('unsure-btn').style.opacity = '0.7';
+
+        } else {
+            document.getElementById('q-number').innerText = `Soru ${currentQuestionIndex + 1} / ${examQuestions.length}`;
+            document.getElementById('review-reason-badge').style.display = 'none';
+            document.getElementById('unsure-btn').style.pointerEvents = 'auto';
+            document.getElementById('unsure-btn').style.opacity = '1';
+        }
+
+        // Progress Bar
+        let total = isReviewMode ? reviewIndices.length : examQuestions.length;
+        let current = isReviewMode ? reviewIndex : currentQuestionIndex;
+        document.getElementById('progress-bar').style.width = `${((current + 1) / total) * 100}%`;
+
+        // Soru Metni
+        document.getElementById('question-text').innerText = qData.question;
+        const container = document.getElementById('options-container');
+        container.innerHTML = '';
+        
+        // Açıklama Kutusu
+        const expBox = document.getElementById('explanation-box');
+        expBox.style.display = 'none';
+        
+        // Şıklar
+        qData.options.forEach((opt, index) => {
+            const btn = document.createElement('div');
+            btn.className = 'option-btn';
+            btn.innerText = opt;
+            
+            if (isReviewMode) {
+                btn.style.cursor = 'default';
+                if (index === qData.correct) btn.classList.add('correct'); // Doğruyu Yeşil Yap
+                else if (index === userAnswers[qIndex]) btn.classList.add('wrong'); // Yanlışı Kırmızı Yap
+            } else {
+                if (userAnswers[currentQuestionIndex] === index) btn.classList.add('selected');
+                btn.onclick = () => selectOption(index);
+            }
+            container.appendChild(btn);
+        });
+
+        // Emin Değilim Butonunu Güncelle
+        updateUnsureUI();
+
+        // Açıklama Göster (Sadece İnceleme Modunda)
+        if (isReviewMode) {
+            expBox.style.display = 'block';
+            expBox.innerHTML = `<strong>ANALİZ:</strong><br>${qData.explanation || 'Açıklama mevcut değil.'}`;
+        }
+
+        // Navigasyon Butonları
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const finishBtn = document.getElementById('finish-btn');
+
+        if (isReviewMode) {
+            prevBtn.disabled = reviewIndex === 0;
+            prevBtn.onclick = prevReviewQuestion;
+            
+            if (reviewIndex === reviewIndices.length - 1) {
+                nextBtn.innerText = "Sonuçlara Dön";
+                nextBtn.onclick = returnToResults;
+            } else {
+                nextBtn.innerText = "Sonraki →";
+                nextBtn.onclick = nextReviewQuestion;
+            }
+            finishBtn.style.display = 'none';
+            nextBtn.style.display = 'block';
+        } else {
+            prevBtn.disabled = currentQuestionIndex === 0;
+            prevBtn.onclick = prevQuestion;
+            nextBtn.innerText = "İleri →";
+            nextBtn.onclick = nextQuestion;
+
+            if (currentQuestionIndex === examQuestions.length - 1) {
+                nextBtn.style.display = 'none';
+                finishBtn.style.display = 'block';
+            } else {
+                nextBtn.style.display = 'block';
+                finishBtn.style.display = 'none';
+            }
+        }
+    }
+
+    function selectOption(index) {
+        if (isExamFinished || isReviewMode) return;
+        userAnswers[currentQuestionIndex] = index;
+        updateUI();
+    }
+
+    function nextQuestion() {
+        if (currentQuestionIndex < examQuestions.length - 1) { currentQuestionIndex++; updateUI(); }
+    }
+    function prevQuestion() {
+        if (currentQuestionIndex > 0) { currentQuestionIndex--; updateUI(); }
+    }
+    function nextReviewQuestion() {
+        if (reviewIndex < reviewIndices.length - 1) { reviewIndex++; updateUI(); }
+    }
+    function prevReviewQuestion() {
+        if (reviewIndex > 0) { reviewIndex--; updateUI(); }
+    }
+
+    function finishExam() {
+        clearInterval(timerInterval);
+        isExamFinished = true;
+        let correctCount = 0;
+        let unsureCount = 0;
+        reviewIndices = [];
+
+        examQuestions.forEach((q, index) => {
+            const isCorrect = userAnswers[index] === q.correct;
+            const isUnsure = userUnsure[index];
+
+            if (isCorrect) correctCount++;
+            if (isUnsure) unsureCount++;
+
+            // İnceleme listesine ekleme mantığı:
+            // 1. Yanlış cevaplar
+            // 2. Doğru ama "Emin Değilim" denilen cevaplar
+            if (!isCorrect || (isCorrect && isUnsure)) {
+                reviewIndices.push(index);
+            }
+        });
+
+        const score = Math.round((correctCount / examQuestions.length) * 100);
+        document.getElementById('main-container').style.display = 'none';
+        document.getElementById('result-screen').style.display = 'block';
+        
+        const scoreCircle = document.getElementById('final-score');
+        scoreCircle.innerText = `%${score}`;
+        scoreCircle.style.borderColor = score >= 70 ? '#27ae60' : '#c0392b';
+        scoreCircle.style.color = score >= 70 ? '#27ae60' : '#c0392b';
+
+        const reviewBtn = document.getElementById('start-review-btn');
+        const msg = document.getElementById('result-msg');
+        const unsureMsg = document.getElementById('unsure-count-msg');
+        
+        if (score >= 85) msg.innerText = "Mükemmel! Gerçek sınava hazırsınız.";
+        else if (score >= 70) msg.innerText = "Tebrikler, geçtiniz. Ancak %85 üzeri için biraz daha tekrar gerekli.";
+        else msg.innerText = "Henüz hazır değilsiniz. Yanlışları analiz edip tekrar deneyin.";
+
+        unsureMsg.innerText = `${unsureCount} soruda emin değildiniz.`;
+
+        if (reviewIndices.length === 0) {
+            reviewBtn.style.display = 'none';
+            unsureMsg.innerText += " İnceleyecek soru yok, hepsi emin ve doğru!";
+        } else {
+            reviewBtn.style.display = 'inline-block';
+            reviewBtn.innerText = `${reviewIndices.length} Soruyu İncele (Yanlış + Şüpheli)`;
+        }
+    }
+
+    function startReviewMode() {
+        isReviewMode = true;
+        reviewIndex = 0;
+        document.getElementById('result-screen').style.display = 'none';
+        document.getElementById('main-container').style.display = 'flex';
+        updateUI();
+    }
+    function returnToResults() {
+        document.getElementById('main-container').style.display = 'none';
+        document.getElementById('result-screen').style.display = 'block';
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,1648 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NASM CNC - Final Simülasyonu (v4.0 - Emin Değilim Modu)</title>
+    <style>
+        :root { --primary: #2c3e50; --accent: #c0392b; --success: #27ae60; --warning: #f39c12; --light: #ecf0f1; --unsure: #9b59b6; }
+        body { font-family: 'Segoe UI', sans-serif; background: #eef2f3; margin: 0; padding: 20px; display: flex; justify-content: center; min-height: 100vh; }
+        .container { background: white; width: 100%; max-width: 800px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        
+        .header { background: var(--primary); color: white; padding: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .timer { font-size: 1.4rem; font-weight: bold; font-family: monospace; background: rgba(0,0,0,0.2); padding: 5px 15px; border-radius: 6px; }
+        .mode-badge { background: var(--warning); color: #2c3e50; padding: 4px 10px; border-radius: 4px; font-size: 0.85rem; font-weight:bold; display: none; }
+
+        .content { padding: 30px; flex-grow: 1; }
+        .question-text { font-size: 1.35rem; margin-bottom: 25px; color: #2c3e50; font-weight: 600; line-height: 1.4; }
+        
+        .options { display: flex; flex-direction: column; gap: 12px; }
+        .option-btn { padding: 18px; border: 2px solid #e0e0e0; background: white; text-align: left; border-radius: 8px; cursor: pointer; transition: all 0.2s; font-size: 1.05rem; color: #444; }
+        .option-btn:hover { background: #f8f9fa; border-color: #bdc3c7; }
+        
+        .option-btn.selected { border-color: var(--primary); background: #e8f4fc; color: var(--primary); font-weight: 600; }
+        .option-btn.correct { border-color: var(--success); background: #d4edda; color: #155724; }
+        .option-btn.wrong { border-color: var(--accent); background: #f8d7da; color: #721c24; text-decoration: line-through; }
+        
+        /* Emin Değilim Checkbox Stili */
+        .unsure-container { margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee; display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+        .unsure-box { width: 20px; height: 20px; border: 2px solid #bdc3c7; border-radius: 4px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .unsure-container.active .unsure-box { background: var(--unsure); border-color: var(--unsure); }
+        .unsure-container.active .unsure-box::after { content: '✔'; color: white; font-size: 14px; }
+        .unsure-text { color: #7f8c8d; font-size: 0.95rem; font-weight: 500; }
+        .unsure-container.active .unsure-text { color: var(--unsure); }
+
+        .explanation-box { margin-top: 25px; padding: 20px; background: #fff3cd; border-left: 6px solid var(--warning); color: #856404; display: none; line-height: 1.6; border-radius: 4px; }
+        .review-reason { margin-bottom: 10px; font-weight: bold; padding: 5px 10px; border-radius: 4px; display: inline-block; font-size: 0.85rem; }
+
+        .footer { padding: 20px; border-top: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #fafafa; }
+        button.nav-btn { padding: 12px 30px; cursor: pointer; background: var(--primary); color: white; border: none; border-radius: 6px; font-size: 1rem; font-weight: 600; transition: background 0.2s; }
+        button.nav-btn:hover { background: #34495e; }
+        button.nav-btn:disabled { background: #cbd5e0; cursor: not-allowed; }
+        button.finish-btn { background: var(--accent); }
+        button.finish-btn:hover { background: #a93226; }
+        button.review-btn { background: var(--warning); color: #2c3e50; padding: 12px 25px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 15px; }
+
+        #result-screen { display: none; padding: 50px; text-align: center; }
+        .score-circle { width: 180px; height: 180px; border-radius: 50%; background: white; color: var(--primary); display: flex; justify-content: center; align-items: center; font-size: 3.5rem; font-weight: bold; margin: 0 auto 30px; border: 8px solid var(--primary); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        
+        .progress-container { height: 8px; background: #e0e0e0; width: 100%; }
+        .progress-bar { height: 100%; background: var(--success); width: 0%; transition: width 0.4s ease; }
+    </style>
+</head>
+<body>
+
+<div class="container" id="main-container">
+    <div class="progress-container"><div class="progress-bar" id="progress-bar"></div></div>
+    <div class="header">
+        <div style="display:flex; flex-direction:column;">
+            <span style="font-size:0.9rem; opacity:0.8;">NASM CNC SİMÜLASYON v4.0</span>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <span id="q-number" style="font-weight:bold;">Soru 1</span>
+                <span class="mode-badge" id="review-badge">İNCELEME MODU</span>
+            </div>
+        </div>
+        <div class="timer" id="timer">90:00</div>
+    </div>
+    
+    <div class="content">
+        <div class="question-text" id="question-text">Soru verisi yükleniyor...</div>
+        
+        <div id="review-reason-badge" style="display:none; margin-bottom:15px;"></div>
+
+        <div class="options" id="options-container"></div>
+        
+        <div class="unsure-container" id="unsure-btn" onclick="toggleUnsure()">
+            <div class="unsure-box"></div>
+            <span class="unsure-text">Bu cevaptan emin değilim (İşaretle)</span>
+        </div>
+
+        <div class="explanation-box" id="explanation-box"></div>
+    </div>
+
+    <div class="footer">
+        <button class="nav-btn" id="prev-btn" onclick="prevQuestion()">← Geri</button>
+        <button class="nav-btn finish-btn" id="finish-btn" onclick="finishExam()" style="display:none;">SINAVI BİTİR</button>
+        <button class="nav-btn" id="next-btn" onclick="nextQuestion()">İleri →</button>
+    </div>
+</div>
+
+<div class="container" id="result-screen">
+    <h2 style="color:var(--primary); margin-bottom:30px;">Sınav Sonucu</h2>
+    <div class="score-circle" id="final-score">--</div>
+    <p id="result-msg" style="font-size:1.2rem; color:#555; margin-bottom:10px;"></p>
+    <p id="unsure-count-msg" style="font-size:1rem; color:#9b59b6; margin-bottom:30px;"></p>
+    
+    <div style="display:flex; justify-content:center; gap:15px; flex-wrap:wrap;">
+        <button class="review-btn" id="start-review-btn" onclick="startReviewMode()">YANLIŞ VE ŞÜPHELİLERİ İNCELE</button>
+        <button class="nav-btn" onclick="location.reload()">YENİDEN BAŞLAT</button>
+    </div>
+</div>
+
+<script>
+    // ==============================================================
+    // VERİ ALANI - BURAYI DOLDURACAĞIZ
+    // ==============================================================
+    const examQuestions = [{
+        "id": 1,
+        "category": "Beslenme Bilimi",
+        "question": "NASM Standartlarına göre, bir Beslenme Koçu (Nutrition Coach) için aşağıdaki eylemlerden hangisi kesinlikle 'Yetki Alanı' (Scope of Practice) dışındadır ve yasal risk taşır?",
+        "options": [
+            "Danışanlara, genel nüfus için geçerli olan sağlıklı beslenme kılavuzlarına dayanarak makro besin tavsiyelerinde bulunmak.",
+            "Bir danışanın kan tahlillerine bakarak ona 'Tip 2 Diyabet' teşhisi koymak ve kan şekerini düşürmesi için özel bir tıbbi diyet listesi yazmak.",
+            "Farklı protein kaynaklarının (bitkisel vs hayvansal) avantajlarını ve dezavantajlarını bilimsel verilere dayanarak tartışmak.",
+            "Danışanlara 'Porsiyon Kontrolü' stratejilerini (el rehberi vb.) öğreterek kalori alımlarını yönetmelerine yardımcı olmak."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı 'Teşhis' ve 'Tedavi' içerir. Bu sadece Doktorların ve Kayıtlı Diyetisyenlerin (RD) yetkisindedir. Koçlar 'Rehberlik' eder, 'Tedavi' etmez."
+    },
+    {
+        "id": 2,
+        "category": "Beslenme Bilimi",
+        "question": "Enerji metabolizması hesaplanırken, 1 gram Protein ve 1 gram Karbonhidratın vücuda sağladığı enerji miktarı sırasıyla kaçtır?",
+        "options": [
+            "4 kalori (Protein) ve 9 kalori (Karbonhidrat).",
+            "9 kalori (Protein) ve 4 kalori (Karbonhidrat).",
+            "4 kalori (Protein) ve 4 kalori (Karbonhidrat).",
+            "7 kalori (Protein) ve 4 kalori (Karbonhidrat)."
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. Proteinler ve Karbonhidratlar 4 kcal/g enerji sağlar. Yağlar 9 kcal/g, Alkol ise 7 kcal/g enerji sağlar."
+    },
+    {
+        "id": 3,
+        "category": "Beslenme Bilimi",
+        "question": "Termodinamiğin Birinci Yasası (Enerji Korunumu), beslenme ve kilo yönetimi bağlamında temel olarak neyi ifade eder?",
+        "options": [
+            "Enerji yoktan var edilemez ve yok edilemez; sadece dönüştürülür. Kilo değişimi, alınan kalori ile harcanan kalori arasındaki dengeye bağlıdır.",
+            "Kilo vermek için termodinamik yasalara göre karbonhidratları tamamen kesmek ve sadece yağ yakımına odaklanmak gerekir.",
+            "Proteinler vücutta enerjiye dönüşemez, sadece yapı taşı olarak kullanılır, bu yüzden kalori hesabına katılmazlar.",
+            "Metabolizma hızı yaşla birlikte artar, bu da termodinamik dengenin bozulmasına ve kendiliğinden kilo kaybına neden olur."
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: A şıkkı doğrudur. Yasa 'Enerji Dengesi'ni açıklar. Giren Enerji > Çıkan Enerji = Kilo Alımı. Giren < Çıkan = Kilo Kaybı."
+    },
+    {
+        "id": 4,
+        "category": "Beslenme Bilimi",
+        "question": "Toplam Günlük Enerji Harcamasının (TDEE) bileşenleri düşünüldüğünde, günlük harcanan kalorinin en büyük kısmını (%60-75) hangisi oluşturur?",
+        "options": [
+            "Besinlerin Termik Etkisi (TEF) - Sindirim için harcanan enerji.",
+            "Egzersiz Aktivitesi Termojenezi (EAT) - Spor yaparken harcanan enerji.",
+            "Dinlenme Metabolik Hızı (RMR) - Vücudun hayatta kalmak için harcadığı temel enerji.",
+            "Egzersiz Dışı Aktivite Termojenezi (NEAT) - Yürüme, ayakta durma gibi aktiviteler."
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. Hiç hareket etmeseniz bile organlarınızın çalışması için gereken enerji (RMR), toplam harcamanın en büyük kısmıdır."
+    },
+    {
+        "id": 5,
+        "category": "Beslenme Bilimi",
+        "question": "Vücut tarafından sentezlenemeyen (üretilemeyen) ve mutlaka besinler yoluyla dışarıdan alınması zorunlu olan amino asit grubuna ne ad verilir?",
+        "options": [
+            "Esansiyel Olmayan (Non-Essential) Amino Asitler.",
+            "Esansiyel (Essential / Elzem) Amino Asitler.",
+            "Koşullu Esansiyel (Conditionally Essential) Amino Asitler.",
+            "Dallı Zincirli Amino Asitler (BCAA)."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. 'Esansiyel' kelimesi biyolojide 'Vücut yapamaz, dışarıdan al' demektir. 9 adet esansiyel amino asit vardır."
+    },
+    {
+        "id": 6,
+        "category": "Beslenme Bilimi",
+        "question": "Aşağıdakilerden hangisi, vücudun ihtiyaç duyduğu tüm esansiyel amino asitleri yeterli miktarda içeren 'Tam Protein' (Complete Protein) kaynağına örnektir?",
+        "options": [
+            "Beyaz Pirinç (Lizin amino asidi eksiktir).",
+            "Fıstık Ezmesi (Metiyonin amino asidi eksiktir).",
+            "Yumurta (Tüm esansiyel amino asitleri tam profilde içerir).",
+            "Tam Buğday Ekmeği (Lizin amino asidi eksiktir)."
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. Hayvansal kaynaklar (et, süt, yumurta) genellikle tam proteindir. Bitkisel kaynaklarda (soya hariç) genellikle 1-2 amino asit eksiktir."
+    },
+    {
+        "id": 7,
+        "category": "Beslenme Bilimi",
+        "question": "Vücuttaki Glikojen (karbonhidrat deposu) temel olarak hangi iki dokuda depolanır ve kullanılır?",
+        "options": [
+            "Karaciğer (kan şekerini dengelemek için) ve Kaslar (hareket enerjisi için).",
+            "Pankreas (insülin üretimi için) ve Kan Dolaşımı.",
+            "Mide (sindirim için) ve İnce Bağırsak.",
+            "Adipoz Doku (yağ deposu olarak) ve Beyin."
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: A şıkkı doğrudur. Karaciğerdeki glikojen tüm vücut (beyin) için kullanılır. Kaslardaki glikojen sadece o kasın çalışması için kullanılır."
+    },
+    {
+        "id": 8,
+        "category": "Beslenme Bilimi",
+        "question": "Makro besinler arasında enerji yoğunluğu en yüksek olan Yağların (Lipitlerin) gram başına sağladığı enerji miktarı nedir?",
+        "options": [
+            "4 kalori",
+            "7 kalori",
+            "9 kalori",
+            "12 kalori"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. Yağlar 9 kcal/g enerji verir. Bu yüzden porsiyon hacmi küçük olsa bile kalorisi yüksektir."
+    },
+    {
+        "id": 9,
+        "category": "Beslenme Bilimi",
+        "question": "NEAT (Non-Exercise Activity Thermogenesis) kavramı tam olarak hangi aktiviteleri kapsar?",
+        "options": [
+            "Derin uyku sırasında vücudun harcadığı bazal enerjiyi.",
+            "Spor salonunda yapılan planlı ve tempolu egzersizleri (koşu bandı, ağırlık kaldırma).",
+            "Besinlerin sindirimi ve emilimi sırasında harcanan enerjiyi.",
+            "Planlı spor dışındaki tüm günlük hareketleri (işe yürümek, ayakta durmak, ev işi yapmak, kıpırdanmak)."
+        ],
+        "correct": 3,
+        "explanation": "ANALİZ: D şıkkı doğrudur. NEAT, spor yapmadan harcanan kaloridir ve metabolizmayı canlı tutmak için kritik öneme sahiptir."
+    },
+    {
+        "id": 10,
+        "category": "Beslenme Bilimi",
+        "question": "Kalp sağlığı üzerindeki olumsuz etkileri nedeniyle, diyette tüketiminin en aza indirilmesi veya tamamen kaçınılması önerilen yağ türü hangisidir?",
+        "options": [
+            "Tekli Doymamış Yağlar (Zeytinyağı, Avokado).",
+            "Endüstriyel Trans Yağlar (Kısmi hidrojenize yağlar, margarinler).",
+            "Çoklu Doymamış Yağlar (Balık yağı, Ceviz).",
+            "Omega-3 Yağ Asitleri (EPA, DHA)."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. Trans yağlar LDL'yi (kötü kolesterol) artırır, HDL'yi (iyi) düşürür. Sağlık için 'güvenli' bir alt limiti yoktur, sıfır olmalıdır."
+    },
+    {
+        "id": 11,
+        "category": "Beslenme Bilimi",
+        "question": "Alkolün vücutta bir besin değeri (vitamin/mineral) sağlamamasına rağmen gram başına verdiği enerji değeri nedir?",
+        "options": [
+            "0 kalori (Su gibi etki eder).",
+            "4 kalori (Karbonhidrat gibi etki eder).",
+            "7 kalori (Yağa yakın, proteinden yüksek enerji verir).",
+            "9 kalori (Saf yağ gibi enerji verir)."
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. Alkol 'Boş Kalori'dir. 1 gramı 7 kalori verir ama beslemez."
+    },
+    {
+        "id": 12,
+        "category": "Davranış Değişikliği",
+        "question": "Bir koçun danışanını dinlediğini ve anladığını göstermek için kullandığı 'Yansıtıcı Dinleme' (Reflective Listening) tekniği nasıl uygulanır?",
+        "options": [
+            "Danışanın sözünü kesip, ona kendi hayatından bir örnek vererek tavsiyede bulunmak.",
+            "Danışanın anlattığı duyguyu veya durumu kendi cümleleriyle özetleyerek ona geri bildirmek (örn: 'Yani diyorsun ki...').",
+            "Sadece başını sallayarak sessiz kalmak ve not almak.",
+            "Konuyu hemen değiştirip bir sonraki soruya geçmek."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. Yansıtma, bir ayna görevi görür. Danışan kendi düşüncelerini dışarıdan duyar ve 'Evet, aynen öyle hissediyorum' der."
+    },
+    {
+        "id": 13,
+        "category": "Beslenme Bilimi",
+        "question": "Kan şekeri seviyesini çok hızlı yükselten (High Spike) karbonhidratların 'Glisemik İndeksi' (GI) nasıl sınıflandırılır?",
+        "options": [
+            "Yüksek Glisemik İndeks (High GI) - Örn: Beyaz ekmek, şeker.",
+            "Düşük Glisemik İndeks (Low GI) - Örn: Baklagiller.",
+            "Nötr Glisemik İndeks - Kan şekerini etkilemez.",
+            "Negatif Glisemik İndeks - Kan şekerini düşürür."
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: A şıkkı doğrudur. Hızlı sindirilen ve kana hemen karışan şekerler Yüksek GI'lidir. Bu, insülin dalgalanmalarına ve çabuk acıkmaya neden olur."
+    },
+    {
+        "id": 14,
+        "category": "Beslenme Bilimi",
+        "question": "Proteinlerin sindirim süreci tamamlandığında, kana karışan ve hücreler tarafından kullanılan en küçük yapı taşı nedir?",
+        "options": [
+            "Glikoz (Şeker molekülleri).",
+            "Yağ Asitleri (Trigliseritler).",
+            "Amino Asitler (Peptit bağları kopmuş protein parçaları).",
+            "Gliserol."
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. Protein bir trendir, amino asitler vagonlardır. Sindirim, vagonları birbirinden ayırma işlemidir."
+    },
+    {
+        "id": 15,
+        "category": "Beslenme Bilimi",
+        "question": "Besinlerin Termik Etkisi (TEF), yani yediğimiz yemeği sindirmek için harcadığımız enerji, Toplam Günlük Enerji Harcamasının yaklaşık yüzde kaçını oluşturur?",
+        "options": [
+            "%0-5 (İhmal edilebilir düzeyde).",
+            "%10 (Ortalama bir diyette genel kabul gören oran).",
+            "%30 (Çok yüksek bir oran).",
+            "%50 (Enerjinin yarısı sindirime gider)."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. Karma bir diyette (protein, yağ, karb) alınan kalorinin %10'u sindirim masrafına gider."
+    },
+    {
+        "id": 16,
+        "category": "Beslenme Koçluğu",
+        "question": "'Kanıta Dayalı Uygulama' (Evidence-Based Practice) yaklaşımı, kararların neye dayandırılmasını gerektirir?",
+        "options": [
+            "Sadece koçun kişisel deneyimlerine ve inançlarına.",
+            "Sosyal medyadaki popüler trendlere ve influencer tavsiyelerine.",
+            "En güncel Bilimsel Araştırmalara, Profesyonel Uzmanlığa ve Danışanın Tercihlerine.",
+            "Sadece laboratuvar sonuçlarına ve kan testlerine."
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. Bu bir üçlü saç ayağıdır: Bilim + Tecrübe + Danışanın Değerleri. Sadece biri eksik olursa koçluk eksik kalır."
+    },
+    {
+        "id": 17,
+        "category": "Beslenme Bilimi",
+        "question": "Su tüketimi için genel bir kılavuz olarak, ılıman bir iklimde yaşayan sedanter (hareketsiz) yetişkin bir erkek için önerilen günlük toplam sıvı alımı (gıdalar dahil) yaklaşık ne kadardır?",
+        "options": [
+            "1.5 Litre (Yetersiz olabilir).",
+            "2.0 Litre (Kadınlar için alt sınır).",
+            "3.7 Litre (Yaklaşık 15.5 bardak - NASM/IOM standardı).",
+            "5.0 Litre (Aşırı olabilir)."
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. Erkekler için 3.7L, Kadınlar için 2.7L genel referans değerdir. (Bunun %20'si yiyeceklerden gelir)."
+    },
+    {
+        "id": 18,
+        "category": "Beslenme Bilimi",
+        "question": "ATP (Adenozin Trifosfat) molekülünün vücuttaki temel biyolojik görevi nedir?",
+        "options": [
+            "Hücresel enerji para birimidir; besinlerden elde edilen enerjiyi hücrenin kullanabileceği forma taşır.",
+            "Sadece yağ dokusunda uzun süreli enerji depolamaya yarar.",
+            "Kemik yapısını güçlendirerek iskelet sistemini destekler.",
+            "Kanın pıhtılaşmasını sağlayan ana proteindir."
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: A şıkkı doğrudur. Vücut dolar veya euro kullanmaz, ATP kullanır. Yediğimiz her şey (protein, yağ, karb) ATP'ye dönüşmek zorundadır."
+    },
+    {
+        "id": 19,
+        "category": "Beslenme Bilimi",
+        "question": "Ketojenik diyetin (Keto) makro besin dağılımındaki temel prensibi nedir?",
+        "options": [
+            "Yüksek karbonhidrat, düşük yağ, orta protein.",
+            "Yüksek protein, sıfır yağ, orta karbonhidrat.",
+            "Çok düşük karbonhidrat (%5-10), çok yüksek yağ (%70-75) ve orta protein.",
+            "Sadece sıvı besinlerden oluşan detoks diyeti."
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. Karbonhidratı keserek vücudu glikoz yerine yağ (keton) kullanmaya zorlamaktır."
+    },
+    {
+        "id": 20,
+        "category": "Davranış Değişikliği",
+        "question": "SMART hedef belirleme modelindeki 'R' harfi neyi temsil eder?",
+        "options": [
+            "Random (Rastgele) - Hedefin sürpriz olması gerektiğini.",
+            "Relevant (İlgili/Alakalı) - Hedefin kişinin değerleri, öncelikleri ve yetenekleriyle uyumlu olması gerektiğini.",
+            "Rapid (Hızlı) - Hedefin çok çabuk gerçekleşmesi gerektiğini.",
+            "Rare (Nadir) - Hedefin kimsede olmayan özel bir hedef olması gerektiğini."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. 'Relevant' (veya Realistic). Hedef kişinin hayatına uymuyorsa (İlgisizse), motivasyon düşer."
+    },
+    {
+        "id": 21,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir gıda takviyesinin (supplement) güvenilirliğini ve içinde yasaklı madde olmadığını anlamak için ambalajda hangi 'Üçüncü Taraf Test' mühürleri aranmalıdır?",
+        "options": [
+            "FDA Onaylıdır ibaresi (FDA takviyeleri ilaç gibi onaylamaz).",
+            "Sadece 'Doğal' ve 'Bitkisel' yazması.",
+            "NSF Certified for Sport, Informed Choice veya USP logoları.",
+            "Ünlüler tarafından tavsiye edildiğini gösteren fotoğraflar."
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. Bu logolar, kutunun içindeki tozun bağımsız bir laboratuvar tarafından test edildiğini garanti eder."
+    },
+    {
+        "id": 22,
+        "category": "Beslenme Bilimi",
+        "question": "Genel nüfus (sedanter/hareketsiz yetişkinler) için eksikliği önlemek adına belirlenen Önerilen Günlük Alım (RDA) protein miktarı nedir?",
+        "options": [
+            "0.8 g/kg vücut ağırlığı (Minimum ihtiyaç).",
+            "1.2 g/kg vücut ağırlığı (Aktif bireyler için).",
+            "2.0 g/kg vücut ağırlığı (Sporcular için).",
+            "0.5 g/kg vücut ağırlığı (Yetersiz)."
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: A şıkkı doğrudur. 0.8 g/kg 'Hayatta kalma' sınırıdır. Optimal sağlık veya kas gelişimi için bu miktar artırılabilir."
+    },
+    {
+        "id": 23,
+        "category": "Beslenme Bilimi",
+        "question": "Egzersiz sırasında vücut ağırlığının yüzde kaçı kadar su kaybı (dehidrasyon) yaşandığında aerobik performans ve bilişsel fonksiyonlar olumsuz etkilenmeye başlar?",
+        "options": [
+            "%0.5 (Henüz etki etmez).",
+            "%2 (Kritik eşik, performans düşüşü başlar).",
+            "%10 (Tıbbi acil durum).",
+            "%15 (Ölümcül risk)."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. %2'lik kayıp termoregülasyonu bozar. Susama hissi oluştuğunda genelde bu sınıra yaklaşılmıştır."
+    },
+    {
+        "id": 24,
+        "category": "Beslenme Bilimi",
+        "question": "Aşağıdakilerden hangisi yağda çözünen ve vücutta depolanabilen vitaminlerden biridir?",
+        "options": [
+            "C Vitamini (Suda çözünür, fazlası atılır).",
+            "B12 Vitamini (Suda çözünür).",
+            "D Vitamini (Yağda çözünür, depolanır).",
+            "B6 Vitamini (Suda çözünür)."
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. ADEK vitaminleri (A, D, E, K) yağda çözünür. Bu yüzden yağsız diyetlerde emilimleri bozulur."
+    },
+    {
+        "id": 25,
+        "category": "Davranış Değişikliği",
+        "question": "Değişim Aşamaları Modeli'ne göre, bir kişi egzersizin faydalarını henüz bilmiyorsa ve önümüzdeki 6 ay içinde başlamayı düşünmüyorsa hangi aşamadadır?",
+        "options": [
+            "Düşünme Öncesi (Precontemplation) - İnkar veya bilgisizlik evresi.",
+            "Düşünme (Contemplation) - Başlasam mı diye düşünüyor.",
+            "Hazırlık (Preparation) - Ayakkabısını alıyor.",
+            "Eylem (Action) - Spora gidiyor."
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: A şıkkı doğrudur. 'Sorun yok' veya 'Niyetim yok' aşamasıdır. Koçun görevi farkındalık yaratmaktır."
+    },
+    {
+        "id": 26,
+        "category": "Beslenme Koçluğu",
+        "question": "Koçluk görüşmelerinde 'Açık Uçlu Sorular' (Open-Ended Questions) sormanın temel amacı nedir?",
+        "options": [
+            "Danışandan sadece 'Evet' veya 'Hayır' cevabı alarak zaman kazanmak.",
+            "Danışanın kendi düşüncelerini, duygularını ve motivasyonlarını detaylıca anlatmasını sağlayarak içgörü kazanmak.",
+            "Koçun ne kadar bilgili olduğunu kanıtlamak.",
+            "Görüşmeyi kısa kesmek."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. Kapalı soru bilgiyi doğrular, açık uçlu soru hikayeyi ortaya çıkarır."
+    },
+    {
+        "id": 27,
+        "category": "Beslenme Bilimi",
+        "question": "Kilo alımı (pozitif enerji dengesi), termodinamik yasalarına göre temel olarak nasıl gerçekleşir?",
+        "options": [
+            "Vücudun harcadığı enerjiden daha az kalori alındığında.",
+            "Sadece yağ tüketildiğinde.",
+            "Vücudun harcadığı enerjiden (TDEE) daha fazla kalori alındığında ve fazlasının depolanmasıyla.",
+            "Protein tozu kullanıldığında."
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. Enerji yok olmaz. Fazla enerji (kalori) vücutta yağ dokusu olarak saklanır."
+    },
+    {
+        "id": 28,
+        "category": "Beslenme Bilimi",
+        "question": "Besinlerin emiliminin (kana karışmasının) büyük çoğunluğu sindirim sisteminin hangi bölümünde gerçekleşir?",
+        "options": [
+            "Mide (Daha çok mekanik sindirim yapar).",
+            "İnce Bağırsak (Yüzey alanı geniştir, emilimin merkezidir).",
+            "Kalın Bağırsak (Su ve mineral emilimi yapar).",
+            "Ağız (Sadece karbonhidrat sindirimi başlar)."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. İnce bağırsaktaki villus yapıları sayesinde besinler kana geçer."
+    },
+    {
+        "id": 29,
+        "category": "Beslenme Bilimi",
+        "question": "Yeterli Lif (Fiber) tüketiminin sağlık üzerindeki temel faydalarından biri nedir?",
+        "options": [
+            "Kan şekerini hızla yükselterek ani enerji vermesi.",
+            "Sindirim sistemini düzenlemesi, tokluk hissi sağlaması ve kolesterolü dengelemesi.",
+            "Vücutta yağ depolamayı artırması.",
+            "Kas kütlesini doğrudan artırması."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. Lifler sindirilmez, hacim yaratır. Tok tutar ve bağırsak sağlığını korur."
+    },
+    {
+        "id": 30,
+        "category": "Beslenme Bilimi",
+        "question": "Modern Batı tarzı beslenmede, hangi yağ asidi oranı dengesizdir ve vücutta enflamasyona (iltihaplanma) yol açabilir?",
+        "options": [
+            "Çok yüksek Omega-6 (Ayçiçek, mısırözü) / Düşük Omega-3 (Balık) oranı.",
+            "Çok yüksek Omega-3 / Düşük Omega-6 oranı.",
+            "Yüksek Kolesterol oranı.",
+            "Düşük Doymuş Yağ oranı."
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: A şıkkı doğrudur. İdeal oran 4:1 olmalıyken, günümüzde 20:1 gibidir. Fazla Omega-6 yangıyı artırır."
+    },
+    {
+        "id": 31,
+        "category": "Beslenme Koçluğu",
+        "question": "Gıda etiketlerinde yer alan 'Günlük Değer Yüzdesi' (%DV) genellikle kaç kalorilik standart bir diyet baz alınarak hesaplanır?",
+        "options": [
+            "1500 kalori",
+            "2000 kalori (Yetişkin ortalaması).",
+            "2500 kalori",
+            "3000 kalori"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. Etiketlerdeki yüzdeler (%5, %20 vb.) hep 2000 kalorilik bir insan modeline göredir."
+    },
+    {
+        "id": 32,
+        "category": "Beslenme Koçluğu",
+        "question": "Sağlıklı, sürdürülebilir ve kas kaybını en aza indiren kilo kaybı için genel olarak kabul edilen haftalık kayıp oranı nedir?",
+        "options": [
+            "Haftada 2-3 kg (Çok hızlı, kas kaybı riski).",
+            "Haftada 0.5 - 1.0 kg (veya vücut ağırlığının %1'i kadar).",
+            "Haftada 5 kg (Şok diyet).",
+            "Mümkün olan en hızlı şekilde."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. Yavaş kayıp, yağ kaybıdır. Hızlı kayıp, su ve kas kaybıdır."
+    },
+    {
+        "id": 33,
+        "category": "Davranış Değişikliği",
+        "question": "'Öz Yeterlilik' (Self-Efficacy) kavramı psikolojide neyi ifade eder?",
+        "options": [
+            "Bir kişinin belirli bir görevi veya davranışı başarıyla gerçekleştirebileceğine olan inancı ve güveni.",
+            "Kişinin kendine aşırı güvenmesi ve kibirli olması.",
+            "Başkalarını kontrol etme yeteneği.",
+            "Genetik olarak şanslı olmak."
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: A şıkkı doğrudur. 'Yapabilirim' inancıdır. Bu inanç yüksekse, kişi engeller karşısında pes etmez."
+    },{
+        "id": 34,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir danışanın beslenme alışkanlıklarını değerlendirmek için '24 Saatlik Geri Çağırma' (24-Hour Recall) yöntemi kullanmanın en büyük dezavantajı ve sınırlılığı nedir?",
+        "options": [
+            "Bu yöntem çok pahalı bir yazılım gerektirir ve sadece laboratuvar ortamında uygulanabilir.",
+            "Danışanın hafızasına ve dürüstlüğüne dayalı olduğu için, eksik bildirim (underreporting) riski yüksektir ve tek bir gün, kişinin genel beslenme alışkanlıklarını (tipik bir gününü) yansıtmayabilir.",
+            "Bu yöntemle alınan verilerin kalorilerini hesaplamak teknik olarak imkansızdır, sadece besin gruplarını listelemeye yarar.",
+            "Danışanın 24 saat boyunca hiçbir şey yememesini gerektirdiği için uygulanması çok zordur."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. İnsanlar dün ne yediklerini unutabilirler veya 'sağlıksız' şeyleri söylemekten utanıp saklayabilirler. Ayrıca dün yenenler, haftanın geri kalanını temsil etmeyebilir."
+    },
+    {
+        "id": 35,
+        "category": "Beslenme Bilimi",
+        "question": "Aşırı su tüketimi veya sodyum kaybı sonucu kandaki sodyum konsantrasyonunun tehlikeli derecede düşmesi (dilüsyon) durumuna tıbbi olarak ne ad verilir?",
+        "options": [
+            "Dehidrasyon (Vücut sıvılarının azalması).",
+            "Hipertermi (Vücut sıcaklığının aşırı yükselmesi).",
+            "Hiponatremi (Su zehirlenmesi).",
+            "Hipoglisemi (Kan şekerinin düşmesi)."
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. 'Hipo' (Düşük) + 'Na' (Sodyum) + 'Emia' (Kan). Genellikle maratoncularda veya sadece saf su içip tuz almayan sporcularda görülür."
+    },
+    {
+        "id": 36,
+        "category": "Beslenme Bilimi",
+        "question": "Kas Protein Sentezini (MPS) başlatmak ve tetiklemek için sinyal görevi gören en kritik Dallı Zincirli Amino Asit (BCAA) hangisidir?",
+        "options": [
+            "Valin - Kas dokusunun onarımında ikincil rol oynar.",
+            "İzolösin - Enerji üretimi ve hemoglobin sentezinde etkilidir.",
+            "Lösin (Leucine) - mTOR yolağını aktive ederek kas yapım emrini veren ana anahtardır.",
+            "Glutamin - Bağışıklık sistemini destekler ancak MPS başlatıcısı değildir."
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. Lösin eşik değeri (Leucine Threshold) geçilmeden, vücut protein sentezini (kas yapımını) maksimum seviyede başlatmaz."
+    },
+    {
+        "id": 37,
+        "category": "Beslenme Bilimi",
+        "question": "Dinlenme Metabolik Hızını (RMR) belirleyen ve günlük harcanan kaloriyi en çok etkileyen fizyolojik faktör nedir?",
+        "options": [
+            "Yağsız Vücut Kütlesi (Lean Body Mass) - Kaslar ve organlar ne kadar fazlaysa, vücut istirahatte o kadar çok enerji harcar.",
+            "Vücut Yağ Kütlesi - Yağ dokusu metabolik olarak çok aktiftir ve çok enerji harcar.",
+            "Boy Uzunluğu - Uzun boylu insanlar her zaman daha yavaş metabolizmaya sahiptir.",
+            "Saç Rengi ve Deri Kalınlığı - Genetik faktörler metabolizmanın %90'ını belirler."
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: A şıkkı doğrudur. Kas, bakımı pahalı bir dokudur. RMR'yi artırmanın en kalıcı yolu kas kütlesini artırmaktır."
+    },
+    {
+        "id": 38,
+        "category": "Beslenme Bilimi",
+        "question": "Vücuda alınan alkolün büyük çoğunluğu (%90+) hangi organda ve hangi enzimler aracılığıyla metabolize edilerek (parçalanarak) vücuttan atılır?",
+        "options": [
+            "Böbrekler tarafından süzülerek doğrudan idrarla atılır.",
+            "Mide asidi tarafından parçalanarak ince bağırsağa geçmeden yok edilir.",
+            "Karaciğer tarafından, Alkol Dehidrojenaz (ADH) enzimi kullanılarak parçalanır.",
+            "Kalp tarafından pompalanarak akciğerlerden solunum yoluyla atılır."
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. Karaciğer alkolü 'Asetaldehit'e, sonra da 'Asetat'a çevirir. Karaciğerin saatlik işleme kapasitesi sınırlıdır (yaklaşık 1 kadeh/saat)."
+    },
+    {
+        "id": 39,
+        "category": "Davranış Değişikliği",
+        "question": "Hedef belirleme sürecinde 'Süreç Hedefi' (Process Goal) ile 'Sonuç Hedefi' (Outcome Goal) arasındaki temel stratejik fark nedir?",
+        "options": [
+            "İkisi de aynıdır, sadece isimleri farklıdır.",
+            "Sonuç hedefi gidilecek nihai noktayı (örn: '5 kg vermek') belirtirken; Süreç hedefi bu sonuca ulaşmak için gereken günlük eylemleri (örn: 'Haftada 3 gün antrenman yapmak') belirtir ve kontrolü daha yüksektir.",
+            "Süreç hedefleri her zaman daha zordur ve motivasyonu düşürür.",
+            "Sonuç hedefleri koç tarafından belirlenir, süreç hedefleri danışan tarafından belirlenir."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. Sonucu (Tartıyı) kontrol edemezsiniz ama süreci (Yürüyüş yapmayı) kontrol edebilirsiniz. Başarı, sürece odaklanınca gelir."
+    },
+    {
+        "id": 40,
+        "category": "Beslenme Koçluğu",
+        "question": "Danışanına 'Şu anki kilonu korumak için günde yaklaşık 2500 kaloriye ihtiyacın var' şeklinde bir tahminde bulunmak, bir Beslenme Koçu için uygun mudur?",
+        "options": [
+            "Hayır, bu tıbbi bir teşhis ve reçete yazmaktır, kesinlikle yasaktır.",
+            "Evet, genel kabul görmüş bilimsel formüllere (Mifflin-St Jeor vb.) ve sağlıklı beslenme kılavuzlarına dayanarak tahmini bir hesaplama yapmak koçun yetki alanındadır.",
+            "Sadece endokrinoloji uzmanı doktorlar kalori hesabı yapabilir.",
+            "Sadece sporcu diyetisyenleri kalori hesabı yapabilir."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. Kalori hesabı 'Tıbbi Tedavi' değildir, matematiksel bir tahmindir. Koç bunu yapabilir, ancak 'Bu kesin rakamdır' dememeli, 'Tahmini ihtiyaçtır' demelidir."
+    },
+    {
+        "id": 41,
+        "category": "Beslenme Koçluğu",
+        "question": "NASM'ın pratik porsiyon kontrolü yöntemine (El Rehberi) göre, bir öğün için önerilen standart 'Protein' porsiyonu ne ile ölçülür?",
+        "options": [
+            "Bir yumruk büyüklüğü (Sebzeler için kullanılır).",
+            "Bir avuç içi büyüklüğü ve kalınlığı (Palm) - (Proteinler için kullanılır).",
+            "Bir başparmak büyüklüğü (Yağlar için kullanılır).",
+            "Bir kase dolusu (Karbonhidratlar için kullanılır)."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. Avuç içi (parmaklar hariç), yaklaşık 20-30g protein içeren bir et/tavuk/balık parçasına denktir."
+    },
+    {
+        "id": 42,
+        "category": "Beslenme Bilimi",
+        "question": "Bir kişinin hidrasyon (sıvı dengesi) durumunu günlük hayatta kontrol etmenin en pratik, masrafsız ve güvenilir yolu nedir?",
+        "options": [
+            "Her sabah aç karnına kan sodyum testi yaptırmak.",
+            "İdrar rengini kontrol etmek; açık saman sarısı 'iyi hidrasyonu', koyu sarı/kehribar rengi 'dehidrasyonu' işaret eder.",
+            "Terin tadına bakarak tuz oranını ölçmek.",
+            "Nabız atışını sayarak su ihtiyacını belirlemek."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. USG (İdrar Özgül Ağırlığı) laboratuvar yöntemidir, ancak renk takibi (Urine Color Chart) sahadaki en iyi yöntemdir."
+    },
+    {
+        "id": 43,
+        "category": "Beslenme Bilimi",
+        "question": "Gıdaların işlenme seviyesine göre sınıflandırılan 'Ultra İşlenmiş Gıdalar'ın (Ultra-Processed Foods) tipik özellikleri nelerdir?",
+        "options": [
+            "Besin değeri (mikronutrient) çok yüksek, kalorisi düşüktür ve tamamen doğaldır.",
+            "Sadece taze meyve ve sebzelerden oluşur, raf ömürleri çok kısadır.",
+            "Endüstriyel işlemlerden geçmiş; yüksek oranda ilave şeker, tuz, sağlıksız yağlar ve katkı maddeleri içeren, kalori yoğunluğu yüksek ama besin değeri düşük gıdalardır.",
+            "Evde kolayca hazırlanabilir ve geleneksel yöntemlerle pişirilir."
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. Cips, bisküvi, hazır çorba, sosis vb. bu gruba girer. Obezite ve kronik hastalıklarla doğrudan ilişkilidir."
+    },
+    {
+        "id": 44,
+        "category": "Davranış Değişikliği",
+        "question": "Bir danışanın hem değişmek isteyip (örn: kilo vermek) hem de değişmek istememesi (örn: pizza yemekten vazgeçememek) şeklindeki psikolojik çatışma durumuna ne ad verilir?",
+        "options": [
+            "Direnç (Resistance) - Değişime tamamen karşı çıkma.",
+            "İkilem / Kararsızlık (Ambivalence) - İki zıt isteğin aynı anda var olması.",
+            "İnkar (Denial) - Sorunu kabul etmeme.",
+            "Öz Yeterlilik (Self-Efficacy) - Yapabileceğine inanma."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. Ambivalence (İkilem), değişimin doğal bir parçasıdır. Koçun görevi bu düğümü çözmektir."
+    },
+    {
+        "id": 45,
+        "category": "Beslenme Koçluğu",
+        "question": "Paketli bir ürünün 'İçindekiler' (Ingredients) listesinde kullanılan malzemeler hangi kurala göre sıralanır?",
+        "options": [
+            "Alfabetik sıraya göre (A'dan Z'ye).",
+            "En sağlıklısından en sağlıksızına doğru.",
+            "Ürünün içinde ağırlıkça (miktar olarak) en çok bulunandan en aza doğru.",
+            "Üreticinin tercihine göre rastgele."
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. İlk sırada 'Şeker' yazıyorsa, o ürünün ana maddesi şekerdir. İlk 3 madde ürünün kimliğini belirler."
+    },
+    {
+        "id": 46,
+        "category": "Beslenme Bilimi",
+        "question": "Vücutta kas ve karaciğerdeki glikojen depoları tamamen dolduğunda, fazladan alınan karbonhidratların akıbeti ne olur?",
+        "options": [
+            "Doğrudan kas dokusuna dönüşerek hacim artışı sağlar.",
+            "Kemik dokusuna katılarak iskeleti güçlendirir.",
+            "De Novo Lipogenesis yoluyla yağ asitlerine (Trigliseritlere) dönüştürülür ve yağ dokusunda depolanır.",
+            "Böbrekler tarafından süzülerek idrarla atılır."
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. Depo dolunca taşan enerji yağa dönüşür. Vücut enerjiyi israf etmez (idrarla atmaz), saklar."
+    },
+    {
+        "id": 47,
+        "category": "Beslenme Bilimi",
+        "question": "Hangi yağ türü oda sıcaklığında genellikle katı haldedir ve hayvansal kaynaklarda (et, süt, tereyağı) daha yoğun bulunur?",
+        "options": [
+            "Doymamış Yağlar (Unsaturated) - Genellikle bitkisel ve sıvıdır.",
+            "Doymuş Yağlar (Saturated) - Karbon atomları arasında çift bağ yoktur, bu yüzden oda sıcaklığında katıdır.",
+            "Zeytinyağı - Tekli doymamış yağdır.",
+            "Omega-3 - Çoklu doymamış yağdır."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. Doymuş yağ molekülleri düzdür ve birbirine sıkıca paketlenir, bu da onları katı yapar (Tereyağı gibi)."
+    },
+    {
+        "id": 48,
+        "category": "Davranış Değişikliği",
+        "question": "Koçluk ilişkisinde 'Empati' ile 'Sempati' arasındaki kritik profesyonel fark nedir?",
+        "options": [
+            "Fark yoktur, ikisi de danışanı sevmektir.",
+            "Sempati başkasının hislerini anlamayı içerir; Empati o hisleri bizzat yaşamayı gerektirir.",
+            "Empati, bir kişinin bakış açısını ve duygularını yargılamadan anlamaya çalışmaktır (Bağ kurmak); Sempati ise o kişiye acımak veya onunla aynı duygusal çukura düşmektir.",
+            "Empati profesyonel değildir, koçlar mesafeli olmalıdır."
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. Koçun görevi danışanla birlikte ağlamak (Sempati) değil, onun neden ağladığını anlamak ve destek olmaktır (Empati)."
+    },
+    {
+        "id": 49,
+        "category": "Beslenme Bilimi",
+        "question": "Yoğun egzersiz ve terleme ile vücuttan en çok kaybedilen, eksikliğinde kramp ve performans düşüşüne yol açan birincil elektrolit hangisidir?",
+        "options": [
+            "Kalsiyum",
+            "Demir",
+            "Sodyum (Tuz)",
+            "C Vitamini"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. Ter tuzludur çünkü içinde bolca sodyum vardır. Rehidrasyon sıvılarında sodyum olmasının nedeni budur."
+    },
+    {
+        "id": 50,
+        "category": "Beslenme Bilimi",
+        "question": "Kilo vermek (vücut yağını azaltmak) için temel fiziksel kural olan 'Negatif Enerji Dengesi' neyi ifade eder?",
+        "options": [
+            "Alınan Kalori > Harcanan Kalori (Pozitif Denge - Kilo Alımı).",
+            "Alınan Kalori = Harcanan Kalori (Nötr Denge - Kilo Koruma).",
+            "Alınan Kalori < Harcanan Kalori (Negatif Denge - Kilo Kaybı).",
+            "Yüksek Protein Dengesi - Sadece protein yiyerek zayıflama."
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. Vücut enerji açığı oluştuğunda, bu açığı kapatmak için kendi depolarını (yağları) yakmak zorunda kalır."
+    },
+    {
+        "id": 51,
+        "category": "Davranış Değişikliği",
+        "question": "Motivasyonel Görüşme (Motivational Interviewing) tekniğinin temel iletişim araçları olan 'OARS' kısaltması neyi temsil eder?",
+        "options": [
+            "Open questions (Açık uçlu sorular), Affirmations (Onaylamalar), Reflections (Yansıtmalar), Summaries (Özetlemeler).",
+            "Open attitude (Açık tavır), Realism (Gerçekçilik), Success (Başarı), Strength (Güç).",
+            "Overcoming (Üstesinden gelme), Arguments (Argümanlar), Resistance (Direnç), Strategies (Stratejiler).",
+            "Only Ask Real Stuff (Sadece gerçek şeyleri sor)."
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: A şıkkı doğrudur. OARS, koçun alet çantasındaki 4 ana anahtardır. İletişimi ve güveni bu araçlarla kurar."
+    },
+    {
+        "id": 52,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir diyetin sürdürülemez bir 'Moda Diyet' (Fad Diet) olduğunu gösteren en büyük tehlike işareti (Red Flag) nedir?",
+        "options": [
+            "Bol sebze ve meyve tüketimi önermesi.",
+            "Hızlı, zahmetsiz ve mucizevi sonuçlar vaat etmesi (örn: 'Haftada 5 kilo verin!', 'Göbek eriten tek besin!').",
+            "Egzersizle ve uyku düzeniyle desteklenmesi gerektiğini söylemesi.",
+            "Doktor kontrolünde yapılmasını önermesi."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. Eğer bir şey gerçek olamayacak kadar iyi duyuluyorsa, muhtemelen 'Fad Diet'tir. Bilim yavaş ve istikrarlı ilerlemeyi savunur."
+    },
+    {
+        "id": 53,
+        "category": "Beslenme Bilimi",
+        "question": "Midede bulunan asidik ortamda aktifleşen ve protein sindirimini kimyasal olarak başlatan enzim hangisidir?",
+        "options": [
+            "Amilaz (Tükürükte bulunur, karbonhidratı sindirir).",
+            "Lipaz (Pankreastan salınır, yağı sindirir).",
+            "Pepsin (Midede salınır, proteini sindirir).",
+            "Laktaz (İnce bağırsakta süt şekerini sindirir)."
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. Mide asidi (HCl) pepsinojeni 'Pepsin'e çevirir. Pepsin de proteinleri parçalar."
+    },
+    {
+        "id": 54,
+        "category": "Beslenme Bilimi",
+        "question": "Glutensiz beslenme (Gluten-Free) tıbbi olarak hangi durumda kesinlikle zorunludur ve hayati önem taşır?",
+        "options": [
+            "Kilo vermek isteyen herkes için zorunludur.",
+            "Çölyak Hastalığı (Celiac Disease) tanısı almış bireyler için zorunludur (Bağışıklık sistemi ince bağırsağa saldırır).",
+            "Sporcuların performansını artırmak için zorunludur.",
+            "Tip 2 diyabetlilerde kan şekerini düşürmek için zorunludur."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. Çölyak hastaları için gluten bir 'toksin' gibidir, bağırsak duvarını yok eder. Sağlıklı bireyler için böyle bir zorunluluk yoktur."
+    },
+    {
+        "id": 55,
+        "category": "Beslenme Bilimi",
+        "question": "Kreatin monohidrat takviyesinin bilimsel olarak en çok kanıtlanmış birincil faydası nedir?",
+        "options": [
+            "Doğrudan yağ yakımını %50 artırması.",
+            "Yüksek yoğunluklu, kısa süreli egzersizlerde (Sprint, Ağırlık kaldırma) ATP yenilenmesini hızlandırarak performansı ve gücü artırması.",
+            "Uykuyu düzenleyerek daha derin uyumayı sağlaması.",
+            "Vitamin eksikliklerini gidererek bağışıklığı güçlendirmesi."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. Kreatin, 'Yedek Batarya' gibidir. Ana enerji (ATP) bitince devreye girer ve birkaç saniye daha güç sağlar."
+    },
+    {
+        "id": 56,
+        "category": "Davranış Değişikliği",
+        "question": "Kendi kendini izleme (Self-Monitoring) yönteminin en etkili ve yaygın örneği aşağıdakilerden hangisidir?",
+        "options": [
+            "Koçun danışanı her gün arayıp kontrol etmesi.",
+            "Danışanın bir beslenme günlüğü (food log) veya antrenman günlüğü tutarak kendi davranışlarını kayıt altına alması ve farkındalık kazanması.",
+            "Danışanın tartılmaktan tamamen kaçınması.",
+            "Koçun danışana yemek hazırlayıp göndermesi."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. 'Ölçülen şey yönetilir'. Günlük tutmak, kişinin ne yediğini fark etmesini sağlar (Awareness)."
+    },
+    {
+        "id": 57,
+        "category": "Beslenme Bilimi",
+        "question": "Çözünebilir liflerin (Soluble Fiber - Örn: Yulaf, Elma) sağlık üzerindeki spesifik etkisi nedir?",
+        "options": [
+            "Bağırsak hareketlerini aşırı hızlandırarak ishal yapar.",
+            "Suda çözünerek jel kıvamı alır; mide boşalmasını yavaşlatarak tokluk hissini artırır ve LDL kolesterolü düşürmeye yardımcı olur.",
+            "Hiçbir fizyolojik etkisi yoktur, sindirilmeden atılır.",
+            "Vücutta doğrudan yağa dönüşerek kilo aldırır."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. Çözünür lif, sünger gibidir. Suyu ve kolesterolü tutar, şekerin kana karışmasını yavaşlatır."
+    },
+    {
+        "id": 58,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir Beslenme Koçu (Nutrition Coach), danışanına 'Yemek Planı' (Meal Plan) hazırlayıp verebilir mi?",
+        "options": [
+            "Evet, koçlar herkese detaylı diyet listesi yazabilir.",
+            "Hayır, kişiye özel, gramajlı ve kısıtlayıcı 'Yemek Planı' yazmak Diyetisyenlerin (RD) yetkisindedir; koçlar 'Beslenme Rehberliği' ve öneriler sunar.",
+            "Sadece sporculara yazabilir, sedanterlere yazamaz.",
+            "Sadece kilo almak isteyenlere yazabilir."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. Koçlar 'Menü' değil, 'Strateji' verir. 'Sabah 2 yumurta ye' demek yerine 'Sabah protein alımını artırabilirsin' der."
+    },
+    {
+        "id": 59,
+        "category": "Beslenme Bilimi",
+        "question": "Fruktoz (meyve şekeri) vücutta hangi organ tarafından neredeyse tamamen metabolize edilmek (işlenmek) zorundadır?",
+        "options": [
+            "Sadece Karaciğer (Aşırı fruktoz karaciğeri yorar ve yağlanma yapabilir).",
+            "Kaslar (Doğrudan enerji olarak kullanırlar).",
+            "Beyin (Ana yakıtı fruktozdur).",
+            "Kalp (Fruktozla çalışır)."
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: A şıkkı doğrudur. Diğer hücreler glikozu kullanabilir ama fruktozu sadece karaciğer işleyebilir. Bu yüzden fruktoz 'Karaciğerin yükü'dür."
+    },
+    {
+        "id": 60,
+        "category": "Davranış Değişikliği",
+        "question": "Bilişsel Davranışçı Terapi'den (CBT) uyarlanan 'Hep ya da Hiç Düşüncesi' (All-or-Nothing Thinking) adlı bilişsel çarpıtma neyi ifade eder?",
+        "options": [
+            "Olayları dengeli ve gri tonlarıyla görmek.",
+            "Bir küçük kaçamak (örn: bir kurabiye) yapınca diyeti tamamen 'bozulmuş' sayıp, 'battı balık yan gider' diyerek aşırı yemeye yönelmek (Siyah-Beyaz Düşünce).",
+            "Geleceği planlamak ve riskleri hesaplamak.",
+            "Geçmiş hatalardan ders çıkarıp yola devam etmek."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. Mükemmeliyetçiliğin tuzağıdır. Koçun görevi danışana 'Esnekliği' öğretmektir."
+    },
+    {
+        "id": 61,
+        "category": "Beslenme Bilimi",
+        "question": "Aşağıdaki mikronutrientlerden hangisi, kemik yoğunluğunu korumak ve osteoporozu önlemek için D vitamini ile birlikte çalışarak birincil öneme sahiptir?",
+        "options": [
+            "Demir",
+            "C Vitamini",
+            "Kalsiyum",
+            "B12 Vitamini"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. Kemiklerin ana minereli Kalsiyumdur. D vitamini ise kalsiyumun bağırsaktan emilip kemiğe yerleşmesini sağlayan hormondur."
+    },
+    {
+        "id": 62,
+        "category": "Beslenme Koçluğu",
+        "question": "Danışanların hedef belirlerken 'Gerçekçi' (Realistic) olmalarını sağlamak, koçun hangi rolünü tanımlar?",
+        "options": [
+            "Sorumluluk Alma (Accountability)",
+            "Yol Gösterme (Guidance) - Beklentileri yönetmek ve hayal kırıklığını önlemek.",
+            "Yargılama (Judging)",
+            "Cezalandırma (Punishing)"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. Danışan '1 ayda 10 kilo' diyebilir. Koç, 'Gel bunu daha sağlıklı ve yapılabilir bir seviyeye çekelim' diyerek rehberlik eder."
+    },
+    {
+        "id": 63,
+        "category": "Beslenme Bilimi",
+        "question": "Tip 2 Diyabetin (Şeker Hastalığı) gelişimindeki temel fizyolojik mekanizma olan 'İnsülin Direnci' nedir?",
+        "options": [
+            "Pankreasın doğuştan hiç insülin üretememesi (Tip 1 Diyabet).",
+            "Vücut hücrelerinin, kanda insülin olmasına rağmen ona yanıt vermemesi ve kapılarını glikoza açmaması (Anahtar kilidi açmıyor).",
+            "Çok fazla protein tüketimi sonucu kan şekerinin düşmesi.",
+            "Çok az yağ tüketimi sonucu hormonların bozulması."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. İnsülin direnci, hücrelerin insüline sağırlaşmasıdır. Pankreas daha çok insülin salgılar ama hücreler duymaz."
+    },
+    {
+        "id": 64,
+        "category": "Beslenme Bilimi",
+        "question": "Antioksidanların (C Vitamini, E Vitamini vb.) vücuttaki temel koruyucu görevi nedir?",
+        "options": [
+            "Serbest radikalleri (kararsız molekülleri) nötralize ederek hücresel hasarı (oksidatif stres) ve yaşlanma etkilerini önlemek.",
+            "Kan şekerini aniden yükseltmek.",
+            "Kas kütlesini doğrudan iki katına çıkarmak.",
+            "Uyku kalitesini düşürerek uyanık kalmayı sağlamak."
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: A şıkkı doğrudur. Metabolizma sonucu oluşan 'paslanmayı' (oksidasyon) önleyen moleküllerdir."
+    },
+    {
+        "id": 65,
+        "category": "Davranış Değişikliği",
+        "question": "Bir danışan 'Bu hafta sadece 2 gün sağlıklı beslendim, başarısız oldum' dediğinde, koçun 'Yani 2 gün boyunca hedefine sadık kalabildin, bu harika bir başlangıç!' diyerek bakış açısını değiştirmesi hangi tekniktir?",
+        "options": [
+            "Yeniden Çerçeveleme (Reframing) - Olayın negatif değil pozitif yönünü gösterme.",
+            "Eleştiri (Criticism)",
+            "Sorgulama (Questioning)",
+            "Görmezden Gelme (Ignoring)"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: A şıkkı doğrudur. Bardağın boş tarafını değil, dolu tarafını göstererek motivasyonu koruma sanatıdır."
+    },
+    {
+        "id": 66,
+        "category": "Beslenme Koçluğu",
+        "question": "Porsiyon kontrolü için kullanılan 'Tabağım' (MyPlate) modeline göre, ideal bir öğün tabağının yarısı (%50'si) hangi besin grubundan oluşmalıdır?",
+        "options": [
+            "Tahıllar ve Proteinler",
+            "Meyve ve Sebzeler (Vitamin, mineral ve lif kaynağı olarak).",
+            "Süt Ürünleri",
+            "Yağlar ve Tatlılar"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. Tabağın yarısı renkli (sebze/meyve), çeyreği protein, çeyreği tahıl olmalıdır. Bu en basit denge kuralıdır."
+    },{
+        "id": 67,
+        "category": "Beslenme Bilimi",
+        "question": "Vegan beslenen bireylerde eksikliği en sık görülen ve sinir sistemi sağlığı için mutlaka takviye edilmesi gereken vitamin hangisidir?",
+        "options": [
+            "C Vitamini - Bitkisel kaynaklarda (turunçgiller) bolca bulunur, eksikliği nadirdir.",
+            "A Vitamini - Turuncu sebzelerde (beta-karoten) bulunur, vücut dönüştürebilir.",
+            "B12 Vitamini - Doğal formu sadece hayvansal gıdalarda bulunur; eksikliği kalıcı sinir hasarına yol açabilir.",
+            "E Vitamini - Kuruyemiş ve tohumlarda bolca bulunur."
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. B12 bitkilerde bulunmaz. Veganlar takviye almazsa depoları tükenir ve anemi/sinir hasarı riski doğar."
+    },
+    {
+        "id": 68,
+        "category": "Beslenme Bilimi",
+        "question": "'Enerji Yoğunluğu' (Energy Density) yüksek olan gıdaların karakteristik özelliği nedir?",
+        "options": [
+            "Hacimlerine göre çok yüksek kalori içermeleri (Örn: Yağlar, kuruyemişler, işlenmiş atıştırmalıklar).",
+            "Hacimlerine göre çok az kalori içermeleri ve bol su/lif barındırmaları (Örn: Ispanak, karpuz).",
+            "Sindirilmelerinin çok zor olması ve negatif kalori etkisi yaratmaları.",
+            "Sadece protein ağırlıklı olmaları."
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: A şıkkı doğrudur. Küçük bir avuç fıstık (Yüksek Yoğunluk) ile koca bir kase salata (Düşük Yoğunluk) aynı kaloride olabilir. Kilo kontrolü için düşük yoğunluklular tercih edilmelidir."
+    },
+    {
+        "id": 69,
+        "category": "Beslenme Bilimi",
+        "question": "Kafeinin sportif performansa (Ergojenik) etkisi temel olarak hangi mekanizma ile açıklanır?",
+        "options": [
+            "Merkezi sinir sistemini uyararak 'Adenozin' reseptörlerini bloke eder; bu da yorgunluk hissini geciktirir ve uyanıklığı artırır.",
+            "Doğrudan kaslara oksijen taşıyarak akciğer kapasitesini artırır.",
+            "Kasları gevşeterek esnekliği artırır ve sakatlanmayı önler.",
+            "Kan basıncını düşürerek kalbin daha az çalışmasını sağlar."
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: A şıkkı doğrudur. Adenozin beyne 'Yoruldun, uyu' der. Kafein bu sinyali engeller. Beyin yorulduğunu anlamaz ve çalışmaya devam eder."
+    },
+    {
+        "id": 70,
+        "category": "Davranış Değişikliği",
+        "question": "Davranış değişikliği sürecinde 'Sosyal Destek' (Social Support) neden kritik bir faktördür?",
+        "options": [
+            "Kişinin yalnız hissetmemesini sağlar, motivasyonu artırır ve zor zamanlarda hesap verebilirlik (accountability) sunar.",
+            "Sadece yemek tarifleri paylaşmak için gereklidir.",
+            "Kişinin sorumluluktan kaçmasını sağlar, 'arkadaşım yüzünden bozdum' diyebilir.",
+            "Gereksizdir, gerçek irade sahibi kişi tek başına başarır."
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: A şıkkı doğrudur. İnsan sosyal bir varlıktır. Çevrenizdeki insanlar hedeflerinizi destekliyorsa başarı şansı katlanır."
+    },
+    {
+        "id": 71,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir Beslenme Koçu, danışanında Yeme Bozukluğu (Anoreksiya, Bulimia vb.) belirtileri fark ederse etik olarak ne yapmalıdır?",
+        "options": [
+            "Kendi tecrübelerine dayanarak danışanı tedavi etmeye çalışmalı ve yemek listesi yazmalıdır.",
+            "Durumun ciddiyetini fark edip, danışanı derhal konunun uzmanı bir sağlık profesyoneline (Psikolog/Psikiyatrist) yönlendirmelidir (Referral).",
+            "Danışanı utandırarak bu davranıştan vazgeçirmeye çalışmalıdır.",
+            "Görmezden gelip spor programına odaklanmalıdır."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. Yeme bozuklukları psikiyatrik hastalıklardır. Koçun yetki alanını (Scope of Practice) aşar ve müdahale etmek tehlikeli olabilir."
+    },
+    {
+        "id": 72,
+        "category": "Beslenme Bilimi",
+        "question": "Kan şekerinin fazlası, karaciğer ve kaslarda hangi formda depolanır?",
+        "options": [
+            "Glikojen (İnsan nişastası olarak da bilinir).",
+            "Glukagon (Bu bir hormondur, depo maddesi değildir).",
+            "İnsülin (Bu bir hormondur).",
+            "Selüloz (İnsan vücudu bunu sindiremez)."
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: A şıkkı doğrudur. Vücut glikozu 'Glikojen' paketleri halinde saklar. Depolar dolunca fazlası yağa çevrilir."
+    },
+    {
+        "id": 73,
+        "category": "Beslenme Bilimi",
+        "question": "Mide boşaldığında salgılanan ve beyne 'Acıktım' sinyali gönderen hormon hangisidir?",
+        "options": [
+            "Leptin (Tokluk hormonudur).",
+            "Ghrelin ('Guruldayan' mide hormonu - İştahı açar).",
+            "İnsülin (Kan şekerini düşürür).",
+            "Kortizol (Stres hormonudur)."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. Ghrelin mide boşken artar, yemek yiyince düşer. 'Ghrelin = Growling' (Guruldama) kodlamasıyla hatırlanabilir."
+    },
+    {
+        "id": 74,
+        "category": "Beslenme Bilimi",
+        "question": "Yağ hücrelerinden (Adipoz doku) salgılanan ve beyne 'Doydum, yeterli enerji var' sinyali gönderen hormon hangisidir?",
+        "options": [
+            "Leptin (Uzun vadeli enerji göstergesi).",
+            "Ghrelin (Açlık hormonu).",
+            "Testosteron (Cinsiyet hormonu).",
+            "Adrenalin (Savaş-Kaç hormonu)."
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: A şıkkı doğrudur. Yağ dokusu arttıkça Leptin artar ve beyne 'Yemeği kes' der. Obezitede bu sinyal bozulabilir (Leptin Direnci)."
+    },
+    {
+        "id": 75,
+        "category": "Beslenme Bilimi",
+        "question": "Bağırsak sağlığı için önemli olan Probiyotikler ile Prebiyotikler arasındaki temel fark nedir?",
+        "options": [
+            "Probiyotikler canlı yararlı bakterilerdir (Tohum); Prebiyotikler ise bu bakterilerin beslenmesini sağlayan liflerdir (Gübre).",
+            "Prebiyotikler canlı bakteridir, Probiyotikler onların yiyeceğidir.",
+            "İkisi de aynı şeydir, sadece pazarlama isimleri farklıdır.",
+            "Probiyotikler zararlı bakterileri öldüren ilaçlardır."
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: A şıkkı doğrudur. Yoğurt/Kefir probiyotiktir (bakteri içerir). Muz/Soğan prebiyotiktir (bakteriyi besler)."
+    },
+    {
+        "id": 76,
+        "category": "Davranış Değişikliği",
+        "question": "Bir hedefe ulaşmak için 'Eğer X olursa, o zaman Y yapacağım' (If-Then Plans) şeklinde önceden planlama yapmaya ne ad verilir?",
+        "options": [
+            "Uygulama Niyeti (Implementation Intention).",
+            "Sadece 'başaracağım' diye düşünmek (Pozitif düşünce).",
+            "Akışına bırakmak.",
+            "Öz-Sabotaj."
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: A şıkkı doğrudur. Bu teknik, iradeye güvenmek yerine otomatiğe bağlamayı sağlar. 'Eve gelince (X), hemen spor kıyafetimi giyeceğim (Y)'."
+    },
+    {
+        "id": 77,
+        "category": "Beslenme Koçluğu",
+        "question": "Danışanın çözüm yollarını kendisinin bulmasına yardımcı olmak (Otonomi Desteği) koçlukta neden önemlidir?",
+        "options": [
+            "Çünkü koçun fikri yoksa danışan bulsun diye.",
+            "Kendi bulduğu çözüme olan bağlılığı (sahiplenme duygusu) ve uygulama ihtimali, dışarıdan dayatılan bir çözüme göre çok daha yüksektir.",
+            "Koçun iş yükünü azaltmak için.",
+            "Danışan daha az para ödesin diye."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. İnsanlar kendi fikirlerini savunur ve uygularlar. Emirleri ise sadece zorundalarken yaparlar."
+    },
+    {
+        "id": 78,
+        "category": "Beslenme Bilimi",
+        "question": "Böbrek sorunu olmayan sağlıklı bireylerde, aşırı protein tüketiminin en olası metabolik sonucu nedir?",
+        "options": [
+            "Böbreklerin anında iflas etmesi.",
+            "Fazla alınan kalorinin, vücut ihtiyacı karşılandıktan sonra yağa dönüştürülerek (Lipogenez) depolanması.",
+            "Kasların kontrolsüzce büyümesi.",
+            "Kemiklerin erimesi."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. Protein 'sihirli' değildir, kaloridir. Fazlası kas olmaz, göbek yağı olur."
+    },
+    {
+        "id": 79,
+        "category": "Beslenme Bilimi",
+        "question": "Omega-3 yağ asitlerinin (EPA ve DHA) biyoyararlanımı en yüksek olan doğal kaynağı hangisidir?",
+        "options": [
+            "Yağlı soğuk su balıkları (Somon, Uskumru, Sardalya).",
+            "Kırmızı et ve sakatatlar.",
+            "Tavuk göğsü ve hindi.",
+            "Keten tohumu (Sadece ALA içerir, dönüşüm oranı düşüktür)."
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: A şıkkı doğrudur. Bitkisel kaynaklar (ceviz, keten) ALA içerir ama vücut bunu EPA/DHA'ya zor çevirir. Balık direkt EPA/DHA kaynağıdır."
+    },
+    {
+        "id": 80,
+        "category": "Beslenme Bilimi",
+        "question": "Egzersiz sonrası beslenmede 'Anabolik Pencere' kavramı güncel bilimsel verilerle nasıl güncellenmiştir?",
+        "options": [
+            "Antrenmandan sonraki 30 dakika içinde protein alınmazsa antrenman boşa gider.",
+            "Kas protein sentezi antrenmandan sonraki 24-48 saat boyunca duyarlıdır; yani 'pencere' geniştir, acilen içmek yerine toplam günlük protein alımı daha önemlidir.",
+            "Antrenmandan önce protein alınmalıdır, sonrası önemsizdir.",
+            "Gece yatmadan önce yemek yenmemelidir."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. 'Hemen içmezsen kasların erir' düşüncesi eskide kaldı. Önemli olan gün sonunda toplam ne kadar yediğindir."
+    },
+    {
+        "id": 81,
+        "category": "Beslenme Bilimi",
+        "question": "Alkol tüketimi, vücuttaki yağ yakım sürecini (Lipid Oksidasyonu) nasıl etkiler?",
+        "options": [
+            "Metabolizmayı hızlandırarak yağ yakımını artırır.",
+            "Hiçbir etkisi yoktur.",
+            "Vücut alkolü toksin olarak algılayıp atmaya öncelik verdiği için, alkol kandan temizlenene kadar yağ yakımını durdurur/baskılar.",
+            "Alkoldeki kaloriler doğrudan kasa dönüşür."
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. Alkol vücut için 'Öncelikli Yakıt'tır (çünkü zehirdir). O yanarken yağlar bekleme odasında bekler."
+    },
+    {
+        "id": 82,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir gıda etiketinde 'Düşük Yağlı' (Low Fat) ibaresi varsa, yasal olarak porsiyon başına en fazla ne kadar yağ içerebilir?",
+        "options": [
+            "3 gram veya daha az.",
+            "0 gram.",
+            "Normal ürünün %50'si kadar.",
+            "Sadece bitkisel yağ içerir."
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: A şıkkı doğrudur. 'Düşük Yağlı' (Low Fat) = <3g. 'Yağsız' (Fat Free) = <0.5g. Bu terimler yasal standartlara tabidir."
+    },
+    {
+        "id": 83,
+        "category": "Beslenme Bilimi",
+        "question": "Egzersiz sonrası kaybedilen sıvıyı yerine koymak (Rehidrasyon) için genel kural nedir?",
+        "options": [
+            "Kaybedilen her 1 kg vücut ağırlığı için yaklaşık 1.25 - 1.5 litre sıvı tüketilmelidir (Fazlası idrarla atılacağı için).",
+            "Sadece susadıkça su içilmelidir.",
+            "Bir bardak su yeterlidir.",
+            "Hiç sıvı alınmamalıdır."
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: A şıkkı doğrudur. 1 kilo terlediyseniz, bunu yerine koymak için 1 litreden biraz fazla (1.25-1.5L) içmelisiniz ki tam hidrasyon sağlansın."
+    },
+    {
+        "id": 84,
+        "category": "Beslenme Bilimi",
+        "question": "Hangi makro besin, sindirimi ve emilimi sırasında vücuda en fazla enerji harcatır (En Yüksek Termik Etki)?",
+        "options": [
+            "Yağlar (%0-3)",
+            "Karbonhidratlar (%5-10)",
+            "Proteinler (%20-30)",
+            "Su (0)"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. Protein yemek, metabolizmayı hızlandırmanın en doğal yoludur. Vücut onu işlemek için çok çalışır."
+    },
+    {
+        "id": 85,
+        "category": "Davranış Değişikliği",
+        "question": "Değişim Aşamaları Modeli'ne göre, bir kişi yeni ve sağlıklı bir davranışı 6 aydan uzun süredir düzenli olarak yapıyorsa hangi aşamadadır?",
+        "options": [
+            "Eylem (Action) - İlk 6 ay.",
+            "Sürdürme / Koruma (Maintenance) - 6 aydan sonrası.",
+            "Hazırlık (Preparation) - Başlamadan hemen öncesi.",
+            "Düşünme (Contemplation) - Kararsızlık."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. 6 aydan sonra davranış 'alışkanlık' haline gelmeye başlar ve risk 'bırakmak' değil 'nüksetmek'tir."
+    },
+    {
+        "id": 86,
+        "category": "Beslenme Bilimi",
+        "question": "Gluten, hangi tahıl grubunda doğal olarak bulunan bir protein ailesidir?",
+        "options": [
+            "Pirinç, Mısır, Patates (Bunlar glutensizdir).",
+            "Buğday, Arpa, Çavdar.",
+            "Kinoa, Karabuğday (Bunlar glutensizdir).",
+            "Sadece yulaf (Yulaf doğal olarak glutensizdir ama çapraz bulaşma olabilir)."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. 'W.B.R' (Wheat, Barley, Rye) koduyla hatırlanabilir."
+    },
+    {
+        "id": 87,
+        "category": "Beslenme Koçluğu",
+        "question": "NASM el rehberine göre, porsiyon kontrolü yaparken 'Başparmak' (Thumb) ölçüsü hangi besin grubu için kullanılır?",
+        "options": [
+            "Protein (Avuç içi).",
+            "Sebzeler (Yumruk).",
+            "Sağlıklı Yağlar (Başparmak - Çünkü kalorisi çok yüksektir, az yenmelidir).",
+            "Karbonhidratlar (Kaselenmiş avuç)."
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. Yağlar 9 kaloridir, bu yüzden porsiyonu en küçük olandır (Başparmak)."
+    },
+    {
+        "id": 88,
+        "category": "Beslenme Bilimi",
+        "question": "Endüstriyel Trans Yağların (Kısmi Hidrojenize) sağlık üzerindeki en belirgin ve kanıtlanmış olumsuz etkisi nedir?",
+        "options": [
+            "Kötü kolesterolü (LDL) artırıp, iyi kolesterolü (HDL) düşürerek kalp-damar hastalığı riskini ciddi oranda artırır.",
+            "Kas kütlesini azaltarak güçsüzlüğe neden olur.",
+            "Kemikleri zayıflatarak kırılma riskini artırır.",
+            "Göz bozukluğuna yol açar."
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: A şıkkı doğrudur. Trans yağlar damar sağlığının bir numaralı düşmanıdır."
+    },
+    {
+        "id": 89,
+        "category": "Davranış Değişikliği",
+        "question": "Motivasyonel Görüşmede 'Dirençle Dans Etmek' (Rolling with Resistance) prensibi neyi ifade eder?",
+        "options": [
+            "Danışanla inatlaşarak doğrusunu kabul ettirmek.",
+            "Danışanın itirazlarına karşıt argüman sunmak yerine, onları kabul edip enerjiyi yönlendirmek; çatışmadan kaçınmak.",
+            "Danışanı görmezden gelmek.",
+            "Danışana ne yapacağını emretmek."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. Danışan 'Yapamam' dediğinde, 'Yaparsın' demek direnci artırır. 'Seni neyin zorladığını anlıyorum, peki sence ne işe yarardı?' demek dirençle dans etmektir."
+    },
+    {
+        "id": 90,
+        "category": "Beslenme Bilimi",
+        "question": "Dünya Sağlık Örgütü (WHO), günlük alınan toplam kalorinin en fazla yüzde kaçının 'Eklenmiş Şeker'den (Added Sugar) gelmesini önermektedir?",
+        "options": [
+            "%50",
+            "%25",
+            "%10 (İdeal sağlık için %5'in altı önerilir).",
+            "%0 (İmkansızdır)."
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. 2000 kalorilik bir diyette bu, maksimum 200 kalori (50g şeker) demektir."
+    },
+    {
+        "id": 91,
+        "category": "Beslenme Koçluğu",
+        "question": "Bir Beslenme Koçu, danışanında klinik depresyon veya şiddetli anksiyete belirtileri gözlemlerse etik sorumluluğu nedir?",
+        "options": [
+            "Ona neşeli olmasını söyleyip motive etmeye çalışmak.",
+            "Bitkisel takviyelerle tedavi etmeye çalışmak.",
+            "Durum yetki alanını aştığı için (Scope of Practice), danışanı bir ruh sağlığı uzmanına yönlendirmektir (Referral).",
+            "Diyetini değiştirip sonucunu beklemek."
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. Ruh sağlığı sorunları tıbbi bir durumdur. Koçun görevi teşhis veya tedavi değil, doğru uzmana yönlendirmektir."
+    },
+    {
+        "id": 92,
+        "category": "Beslenme Bilimi",
+        "question": "Vejetaryenlerin, eksik amino asit profillerini tamamlamak için farklı bitkisel protein kaynaklarını (örn: pirinç ve fasulye) gün içinde tüketmesine ne ad verilir?",
+        "options": [
+            "Protein Tamamlama (Protein Complementation).",
+            "Protein Sentezi.",
+            "Protein Yıkımı.",
+            "Karbonhidrat Yüklemesi."
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: A şıkkı doğrudur. Birinde eksik olan amino asit, diğerinde vardır. Birleşince 'Voltran'ı (Tam Proteini) oluştururlar."
+    },
+    {
+        "id": 93,
+        "category": "Beslenme Bilimi",
+        "question": "'Metabolik Adaptasyon' (veya Adaptif Termojenez) uzun süreli ve düşük kalorili diyetlerde neden gerçekleşir?",
+        "options": [
+            "Vücut, 'kıtlık' algısıyla enerji harcamasını (metabolizmayı) yavaşlatarak hayatta kalmaya ve enerji deposunu korumaya çalışır.",
+            "Metabolizma hızlanır çünkü vücut yağ yakmak ister.",
+            "Vücut daha fazla kas yaparak enerji harcar.",
+            "İştah tamamen kapanır."
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: A şıkkı doğrudur. Vücut zayıflamayı 'tehdit' olarak görür ve kombiyi kısar (metabolizmayı yavaşlatır). Kilo vermenin durmasının (Plato) ana nedeni budur."
+    },
+    {
+        "id": 94,
+        "category": "Beslenme Koçluğu",
+        "question": "Süpermarketlerde 'Sağlıklı Alışveriş' stratejisi olarak bilinen 'Dış Çevre' (Perimeter Shopping) kuralı neyi ifade eder?",
+        "options": [
+            "Kasa önündeki ürünleri almayı.",
+            "Orta reyonlardaki paketli ürünlere odaklanmayı.",
+            "Marketin dış duvarları boyunca dizilen taze gıdalara (sebze, meyve, et, süt) odaklanıp, işlenmiş gıdaların olduğu orta reyonlardan kaçınmayı.",
+            "Sadece donmuş gıda reyonundan alışveriş yapmayı."
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: C şıkkı doğrudur. Taze gıdalar (bozulabilenler) genelde marketin çevresinde soğutucularda olur. Paketli ve koruyuculu gıdalar ortada olur."
+    },
+    {
+        "id": 95,
+        "category": "Davranış Değişikliği",
+        "question": "Yeni bir alışkanlık kazanmak için çevreyi düzenleme (örn: su içmeyi hatırlamak için masaya sürahi koymak) stratejisine ne ad verilir?",
+        "options": [
+            "Uyaran Kontrolü (Stimulus Control) - Ortamdaki ipuçlarını değiştirme.",
+            "Ceza.",
+            "Ödül.",
+            "İnkar."
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: A şıkkı doğrudur. Görünür kılmak, yapmayı kolaylaştırır. Uyaranı (sürahiyi) göz önüne koyarak davranışı tetiklersiniz."
+    },
+    {
+        "id": 96,
+        "category": "Beslenme Bilimi",
+        "question": "Sindirimi en yavaş olan, kan şekerini en dengeli yükselten ve en uzun süre tokluk sağlayan karbonhidrat türü hangisidir?",
+        "options": [
+            "Basit Şekerler (Bal, reçel).",
+            "Kompleks ve Lifli Karbonhidratlar (Yulaf, mercimek, tam tahıllar).",
+            "Meyve Suları (Liften arındırılmış).",
+            "Sofra Şekeri."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. Lif, sindirimin frenidir. Şekerin kana yavaş karışmasını sağlar, insülin dalgalanmasını önler."
+    },
+    {
+        "id": 97,
+        "category": "Beslenme Bilimi",
+        "question": "A, D, E ve K vitaminlerinin ortak biyokimyasal özelliği nedir?",
+        "options": [
+            "Suda çözünürler, fazlası idrarla atılır.",
+            "Yağda çözünürler (Liposoluble); emilimleri için diyet yağına ihtiyaç duyarlar ve fazlası vücutta depolanabilir.",
+            "Kalorileri çok yüksektir.",
+            "Sadece hayvansal gıdalarda bulunurlar."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. Yağsız salata yerseniz, bu vitaminleri (salatadaki A, E, K) ememezsiniz. Yağ 'taşıyıcı'dır."
+    },
+    {
+        "id": 98,
+        "category": "Beslenme Koçluğu",
+        "question": "Motivasyonel Görüşmede koçun danışana söylediği 'Onaylama' (Affirmation) cümlesine en uygun örnek hangisidir?",
+        "options": [
+            "Neden daha fazla çabalamadın?",
+            "Bu hafta o kadar yoğunluğuna rağmen öğünlerini hazırlamak için gösterdiğin çaba ve kararlılık gerçekten takdire şayan.",
+            "Bence yanlış yapıyorsun.",
+            "Bunu herkes yapabilir, abartma."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. Onaylama, iltifat etmek değildir; kişinin güçlü bir özelliğini (kararlılık, çaba) fark edip ona geri yansıtmaktır."
+    },
+    {
+        "id": 99,
+        "category": "Beslenme Bilimi",
+        "question": "Sağlıklı yetişkinler için genel olarak güvenli kabul edilen günlük kafein alım üst sınırı yaklaşık ne kadardır?",
+        "options": [
+            "100 mg (1 fincan kahve).",
+            "400 mg (Yaklaşık 3-4 fincan filtre kahve).",
+            "1000 mg (Toksik doz).",
+            "Limitsiz."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. 400 mg güvenli sınırdır. Hamilelerde bu sınır 200 mg'a düşer."
+    },
+    {
+        "id": 100,
+        "category": "Genel Tekrar",
+        "question": "Tebrikler! Sınav 1'in revize edilmiş halini tamamladınız. Son soru: Bir NASM Beslenme Koçu, danışanına 'Tıbbi Beslenme Tedavisi' (MNT) uygulayabilir mi?",
+        "options": [
+            "Evet, sertifikayı alınca uygulayabilir.",
+            "Hayır, MNT (hastalık tedavisi için diyet) sadece Kayıtlı Diyetisyenlerin (RD) ve Doktorların yetki alanındadır. Koçlar sağlıklı bireylere rehberlik eder.",
+            "Sadece diyabetlilere uygulayabilir.",
+            "Sadece sporculara uygulayabilir."
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: B şıkkı doğrudur. Koçlar 'Tedavi' etmez, 'Eğitir' ve 'Motive' eder. Kırmızı çizgi budur."
+    }
+]; 
+    // ==============================================================
+
+    let currentQuestionIndex = 0;
+    let userAnswers = [];
+    let userUnsure = []; // Emin değilim durumlarını tutar
+    let timeLeft = 90 * 60; 
+    let timerInterval;
+    let isExamFinished = false;
+    let isReviewMode = false;
+    let reviewIndices = []; // İnceleme modunda gösterilecek soru indeksleri
+    let reviewIndex = 0; 
+
+    window.onload = function() {
+        if(examQuestions.length === 0) {
+            document.getElementById('question-text').innerText = "Lütfen soru verilerini koda ekleyin!";
+            return;
+        }
+        userAnswers = new Array(examQuestions.length).fill(null);
+        userUnsure = new Array(examQuestions.length).fill(false);
+        updateUI(); 
+        startTimer(); 
+    };
+
+    function startTimer() {
+        timerInterval = setInterval(() => {
+            if (timeLeft <= 0) { finishExam(); return; }
+            timeLeft--;
+            let m = Math.floor(timeLeft / 60);
+            let s = timeLeft % 60;
+            document.getElementById('timer').innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
+            if(timeLeft < 300) document.getElementById('timer').style.color = '#e74c3c';
+        }, 1000);
+    }
+
+    function toggleUnsure() {
+        if (isExamFinished || isReviewMode) return;
+        let qIndex = currentQuestionIndex;
+        userUnsure[qIndex] = !userUnsure[qIndex];
+        updateUnsureUI();
+    }
+
+    function updateUnsureUI() {
+        const btn = document.getElementById('unsure-btn');
+        let qIndex = isReviewMode ? reviewIndices[reviewIndex] : currentQuestionIndex;
+        
+        if (userUnsure[qIndex]) btn.classList.add('active');
+        else btn.classList.remove('active');
+    }
+
+    function updateUI() {
+        let qIndex = isReviewMode ? reviewIndices[reviewIndex] : currentQuestionIndex;
+        let qData = examQuestions[qIndex];
+        
+        // Başlık ve Mod Ayarları
+        if (isReviewMode) {
+            document.getElementById('q-number').innerText = `İnceleme ${reviewIndex + 1} / ${reviewIndices.length}`;
+            document.getElementById('review-badge').style.display = 'inline-block';
+            document.getElementById('timer').style.visibility = 'hidden';
+            
+            // Neden İncelemede? (Yanlış mı yaptı yoksa Emin mi değildi?)
+            const reasonBadge = document.getElementById('review-reason-badge');
+            reasonBadge.style.display = 'inline-block';
+            
+            const isCorrect = userAnswers[qIndex] === qData.correct;
+            const isUnsure = userUnsure[qIndex];
+
+            if (!isCorrect) {
+                reasonBadge.innerText = "DURUM: YANLIŞ CEVAP";
+                reasonBadge.style.background = "#f8d7da";
+                reasonBadge.style.color = "#721c24";
+            } else if (isCorrect && isUnsure) {
+                reasonBadge.innerText = "DURUM: DOĞRU AMA EMİN DEĞİLSİN";
+                reasonBadge.style.background = "#e8daef"; // Morumsu
+                reasonBadge.style.color = "#6c3483";
+            }
+
+            // İnceleme modunda "Emin değilim" butonu tıklanamaz ama durumu gösterir
+            document.getElementById('unsure-btn').style.pointerEvents = 'none';
+            document.getElementById('unsure-btn').style.opacity = '0.7';
+
+        } else {
+            document.getElementById('q-number').innerText = `Soru ${currentQuestionIndex + 1} / ${examQuestions.length}`;
+            document.getElementById('review-reason-badge').style.display = 'none';
+            document.getElementById('unsure-btn').style.pointerEvents = 'auto';
+            document.getElementById('unsure-btn').style.opacity = '1';
+        }
+
+        // Progress Bar
+        let total = isReviewMode ? reviewIndices.length : examQuestions.length;
+        let current = isReviewMode ? reviewIndex : currentQuestionIndex;
+        document.getElementById('progress-bar').style.width = `${((current + 1) / total) * 100}%`;
+
+        // Soru Metni
+        document.getElementById('question-text').innerText = qData.question;
+        const container = document.getElementById('options-container');
+        container.innerHTML = '';
+        
+        // Açıklama Kutusu
+        const expBox = document.getElementById('explanation-box');
+        expBox.style.display = 'none';
+        
+        // Şıklar
+        qData.options.forEach((opt, index) => {
+            const btn = document.createElement('div');
+            btn.className = 'option-btn';
+            btn.innerText = opt;
+            
+            if (isReviewMode) {
+                btn.style.cursor = 'default';
+                if (index === qData.correct) btn.classList.add('correct'); // Doğruyu Yeşil Yap
+                else if (index === userAnswers[qIndex]) btn.classList.add('wrong'); // Yanlışı Kırmızı Yap
+            } else {
+                if (userAnswers[currentQuestionIndex] === index) btn.classList.add('selected');
+                btn.onclick = () => selectOption(index);
+            }
+            container.appendChild(btn);
+        });
+
+        // Emin Değilim Butonunu Güncelle
+        updateUnsureUI();
+
+        // Açıklama Göster (Sadece İnceleme Modunda)
+        if (isReviewMode) {
+            expBox.style.display = 'block';
+            expBox.innerHTML = `<strong>ANALİZ:</strong><br>${qData.explanation || 'Açıklama mevcut değil.'}`;
+        }
+
+        // Navigasyon Butonları
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const finishBtn = document.getElementById('finish-btn');
+
+        if (isReviewMode) {
+            prevBtn.disabled = reviewIndex === 0;
+            prevBtn.onclick = prevReviewQuestion;
+            
+            if (reviewIndex === reviewIndices.length - 1) {
+                nextBtn.innerText = "Sonuçlara Dön";
+                nextBtn.onclick = returnToResults;
+            } else {
+                nextBtn.innerText = "Sonraki →";
+                nextBtn.onclick = nextReviewQuestion;
+            }
+            finishBtn.style.display = 'none';
+            nextBtn.style.display = 'block';
+        } else {
+            prevBtn.disabled = currentQuestionIndex === 0;
+            prevBtn.onclick = prevQuestion;
+            nextBtn.innerText = "İleri →";
+            nextBtn.onclick = nextQuestion;
+
+            if (currentQuestionIndex === examQuestions.length - 1) {
+                nextBtn.style.display = 'none';
+                finishBtn.style.display = 'block';
+            } else {
+                nextBtn.style.display = 'block';
+                finishBtn.style.display = 'none';
+            }
+        }
+    }
+
+    function selectOption(index) {
+        if (isExamFinished || isReviewMode) return;
+        userAnswers[currentQuestionIndex] = index;
+        updateUI();
+    }
+
+    function nextQuestion() {
+        if (currentQuestionIndex < examQuestions.length - 1) { currentQuestionIndex++; updateUI(); }
+    }
+    function prevQuestion() {
+        if (currentQuestionIndex > 0) { currentQuestionIndex--; updateUI(); }
+    }
+    function nextReviewQuestion() {
+        if (reviewIndex < reviewIndices.length - 1) { reviewIndex++; updateUI(); }
+    }
+    function prevReviewQuestion() {
+        if (reviewIndex > 0) { reviewIndex--; updateUI(); }
+    }
+
+    function finishExam() {
+        clearInterval(timerInterval);
+        isExamFinished = true;
+        let correctCount = 0;
+        let unsureCount = 0;
+        reviewIndices = [];
+
+        examQuestions.forEach((q, index) => {
+            const isCorrect = userAnswers[index] === q.correct;
+            const isUnsure = userUnsure[index];
+
+            if (isCorrect) correctCount++;
+            if (isUnsure) unsureCount++;
+
+            // İnceleme listesine ekleme mantığı:
+            // 1. Yanlış cevaplar
+            // 2. Doğru ama "Emin Değilim" denilen cevaplar
+            if (!isCorrect || (isCorrect && isUnsure)) {
+                reviewIndices.push(index);
+            }
+        });
+
+        const score = Math.round((correctCount / examQuestions.length) * 100);
+        document.getElementById('main-container').style.display = 'none';
+        document.getElementById('result-screen').style.display = 'block';
+        
+        const scoreCircle = document.getElementById('final-score');
+        scoreCircle.innerText = `%${score}`;
+        scoreCircle.style.borderColor = score >= 70 ? '#27ae60' : '#c0392b';
+        scoreCircle.style.color = score >= 70 ? '#27ae60' : '#c0392b';
+
+        const reviewBtn = document.getElementById('start-review-btn');
+        const msg = document.getElementById('result-msg');
+        const unsureMsg = document.getElementById('unsure-count-msg');
+        
+        if (score >= 85) msg.innerText = "Mükemmel! Gerçek sınava hazırsınız.";
+        else if (score >= 70) msg.innerText = "Tebrikler, geçtiniz. Ancak %85 üzeri için biraz daha tekrar gerekli.";
+        else msg.innerText = "Henüz hazır değilsiniz. Yanlışları analiz edip tekrar deneyin.";
+
+        unsureMsg.innerText = `${unsureCount} soruda emin değildiniz.`;
+
+        if (reviewIndices.length === 0) {
+            reviewBtn.style.display = 'none';
+            unsureMsg.innerText += " İnceleyecek soru yok, hepsi emin ve doğru!";
+        } else {
+            reviewBtn.style.display = 'inline-block';
+            reviewBtn.innerText = `${reviewIndices.length} Soruyu İncele (Yanlış + Şüpheli)`;
+        }
+    }
+
+    function startReviewMode() {
+        isReviewMode = true;
+        reviewIndex = 0;
+        document.getElementById('result-screen').style.display = 'none';
+        document.getElementById('main-container').style.display = 'flex';
+        updateUI();
+    }
+    function returnToResults() {
+        document.getElementById('main-container').style.display = 'none';
+        document.getElementById('result-screen').style.display = 'block';
+    }
+</script>
+</body>
+</html>

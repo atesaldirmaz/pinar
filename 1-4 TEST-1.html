@@ -1,0 +1,1648 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NASM CNC - Final Simülasyonu (v4.0 - Emin Değilim Modu)</title>
+    <style>
+        :root { --primary: #2c3e50; --accent: #c0392b; --success: #27ae60; --warning: #f39c12; --light: #ecf0f1; --unsure: #9b59b6; }
+        body { font-family: 'Segoe UI', sans-serif; background: #eef2f3; margin: 0; padding: 20px; display: flex; justify-content: center; min-height: 100vh; }
+        .container { background: white; width: 100%; max-width: 800px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        
+        .header { background: var(--primary); color: white; padding: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .timer { font-size: 1.4rem; font-weight: bold; font-family: monospace; background: rgba(0,0,0,0.2); padding: 5px 15px; border-radius: 6px; }
+        .mode-badge { background: var(--warning); color: #2c3e50; padding: 4px 10px; border-radius: 4px; font-size: 0.85rem; font-weight:bold; display: none; }
+
+        .content { padding: 30px; flex-grow: 1; }
+        .question-text { font-size: 1.35rem; margin-bottom: 25px; color: #2c3e50; font-weight: 600; line-height: 1.4; }
+        
+        .options { display: flex; flex-direction: column; gap: 12px; }
+        .option-btn { padding: 18px; border: 2px solid #e0e0e0; background: white; text-align: left; border-radius: 8px; cursor: pointer; transition: all 0.2s; font-size: 1.05rem; color: #444; }
+        .option-btn:hover { background: #f8f9fa; border-color: #bdc3c7; }
+        
+        .option-btn.selected { border-color: var(--primary); background: #e8f4fc; color: var(--primary); font-weight: 600; }
+        .option-btn.correct { border-color: var(--success); background: #d4edda; color: #155724; }
+        .option-btn.wrong { border-color: var(--accent); background: #f8d7da; color: #721c24; text-decoration: line-through; }
+        
+        /* Emin Değilim Checkbox Stili */
+        .unsure-container { margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee; display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+        .unsure-box { width: 20px; height: 20px; border: 2px solid #bdc3c7; border-radius: 4px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .unsure-container.active .unsure-box { background: var(--unsure); border-color: var(--unsure); }
+        .unsure-container.active .unsure-box::after { content: '✔'; color: white; font-size: 14px; }
+        .unsure-text { color: #7f8c8d; font-size: 0.95rem; font-weight: 500; }
+        .unsure-container.active .unsure-text { color: var(--unsure); }
+
+        .explanation-box { margin-top: 25px; padding: 20px; background: #fff3cd; border-left: 6px solid var(--warning); color: #856404; display: none; line-height: 1.6; border-radius: 4px; }
+        .review-reason { margin-bottom: 10px; font-weight: bold; padding: 5px 10px; border-radius: 4px; display: inline-block; font-size: 0.85rem; }
+
+        .footer { padding: 20px; border-top: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #fafafa; }
+        button.nav-btn { padding: 12px 30px; cursor: pointer; background: var(--primary); color: white; border: none; border-radius: 6px; font-size: 1rem; font-weight: 600; transition: background 0.2s; }
+        button.nav-btn:hover { background: #34495e; }
+        button.nav-btn:disabled { background: #cbd5e0; cursor: not-allowed; }
+        button.finish-btn { background: var(--accent); }
+        button.finish-btn:hover { background: #a93226; }
+        button.review-btn { background: var(--warning); color: #2c3e50; padding: 12px 25px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 15px; }
+
+        #result-screen { display: none; padding: 50px; text-align: center; }
+        .score-circle { width: 180px; height: 180px; border-radius: 50%; background: white; color: var(--primary); display: flex; justify-content: center; align-items: center; font-size: 3.5rem; font-weight: bold; margin: 0 auto 30px; border: 8px solid var(--primary); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        
+        .progress-container { height: 8px; background: #e0e0e0; width: 100%; }
+        .progress-bar { height: 100%; background: var(--success); width: 0%; transition: width 0.4s ease; }
+    </style>
+</head>
+<body>
+
+<div class="container" id="main-container">
+    <div class="progress-container"><div class="progress-bar" id="progress-bar"></div></div>
+    <div class="header">
+        <div style="display:flex; flex-direction:column;">
+            <span style="font-size:0.9rem; opacity:0.8;">NASM CNC SİMÜLASYON v4.0</span>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <span id="q-number" style="font-weight:bold;">Soru 1</span>
+                <span class="mode-badge" id="review-badge">İNCELEME MODU</span>
+            </div>
+        </div>
+        <div class="timer" id="timer">90:00</div>
+    </div>
+    
+    <div class="content">
+        <div class="question-text" id="question-text">Soru verisi yükleniyor...</div>
+        
+        <div id="review-reason-badge" style="display:none; margin-bottom:15px;"></div>
+
+        <div class="options" id="options-container"></div>
+        
+        <div class="unsure-container" id="unsure-btn" onclick="toggleUnsure()">
+            <div class="unsure-box"></div>
+            <span class="unsure-text">Bu cevaptan emin değilim (İşaretle)</span>
+        </div>
+
+        <div class="explanation-box" id="explanation-box"></div>
+    </div>
+
+    <div class="footer">
+        <button class="nav-btn" id="prev-btn" onclick="prevQuestion()">← Geri</button>
+        <button class="nav-btn finish-btn" id="finish-btn" onclick="finishExam()" style="display:none;">SINAVI BİTİR</button>
+        <button class="nav-btn" id="next-btn" onclick="nextQuestion()">İleri →</button>
+    </div>
+</div>
+
+<div class="container" id="result-screen">
+    <h2 style="color:var(--primary); margin-bottom:30px;">Sınav Sonucu</h2>
+    <div class="score-circle" id="final-score">--</div>
+    <p id="result-msg" style="font-size:1.2rem; color:#555; margin-bottom:10px;"></p>
+    <p id="unsure-count-msg" style="font-size:1rem; color:#9b59b6; margin-bottom:30px;"></p>
+    
+    <div style="display:flex; justify-content:center; gap:15px; flex-wrap:wrap;">
+        <button class="review-btn" id="start-review-btn" onclick="startReviewMode()">YANLIŞ VE ŞÜPHELİLERİ İNCELE</button>
+        <button class="nav-btn" onclick="location.reload()">YENİDEN BAŞLAT</button>
+    </div>
+</div>
+
+<script>
+    // ==============================================================
+    // VERİ ALANI - BURAYI DOLDURACAĞIZ
+    // ==============================================================
+    const examQuestions = [
+    {
+        "id": 1,
+        "category": "Chapter 1 - Introduction to Nutrition Coaching",
+        "question": "NASM Sertifikalı Beslenme Koçunun (CNC) uygulama kapsamı dahilinde, aşağıdakilerden hangisi profesyonel sınırları ihlal eden bir eylemdir?",
+        "options": [
+            "Müşteriye sağlıklı alışkanlıklar için stratejiler sunmak",
+            "Müşterinin hastalıklarını tedavi etmek için diyet yazmak",
+            "Besin etiketlerini okuma konusunda müşteriyi eğitmek",
+            "Protein ve karbonhidrat kaynakları hakkında bilgi vermek"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 1'de belirtildiği üzere, hastalıkları tedavi etmek veya tıbbi beslenme tedavisi (MNT) uygulamak sadece Kayıtlı Diyetisyenlerin (RD/RDN) veya tıp doktorlarının yetkisindedir. CNC, hastalık tedavisi yapamaz."
+    },
+    {
+        "id": 2,
+        "category": "Chapter 2 - Scope of Practice",
+        "question": "Bir müşteri, açıklanamayan ani kilo kaybı ve sürekli yorgunluk şikayetiyle geldiğinde, Beslenme Koçunun izlemesi gereken en doğru prosedür nedir?",
+        "options": [
+            "Kalori alımını artırmak için takviye edici gıda önermek",
+            "Enerji seviyesini yükseltecek makro besin planı hazırlamak",
+            "Durumu teşhis etmeden derhal bir doktora sevk etmek",
+            "Uyku düzenini iyileştirmek için davranışsal hedefler koymak"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: Chapter 2'deki 'Referral' (Sevk Etme) protokollerine göre, açıklanamayan fiziksel semptomlar tıbbi bir durumun işareti olabilir ve teşhis gerektirir. CNC teşhis koyamaz, sevk etmelidir."
+    },
+    {
+        "id": 3,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Bilimsel araştırma hiyerarşisinde, neden-sonuç ilişkisini belirlemede 'Altın Standart' olarak kabul edilen araştırma türü aşağıdakilerden hangisidir?",
+        "options": [
+            "Sistematik Derlemeler ve Meta-Analizler",
+            "Gözlemsel Kesitsel Araştırma Çalışmaları",
+            "Randomize Kontrollü Denemeler (RCT)",
+            "Uzman Görüşleri ve Vaka Raporları"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: Chapter 3'te Bilimsel Kanıt Hiyerarşisi tablosunda belirtildiği üzere, Randomize Kontrollü Denemeler (RCT), müdahalenin doğrudan sonucu etkilediğini kanıtlamada birincil araştırma yöntemi olarak altın standarttır."
+    },
+    {
+        "id": 4,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Bir Beslenme Koçu, 'Bilimsel Yöntem' (Scientific Method) sürecini uygularken hipotez aşamasından sonra hangi adımı atmalıdır?",
+        "options": [
+            "Sonuçları analiz ederek teoriyi oluşturmak",
+            "Bağımsız değişkenleri belirleyip test etmek",
+            "Gözlemleri kaydedip verileri toplamak",
+            "Konuyla ilgili literatür taraması yapmak"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 3'teki Bilimsel Yöntem döngüsüne göre, bir hipotez oluşturulduktan sonraki adım, bu hipotezi test etmek için kontrollü bir deney veya çalışma (test/experiment) tasarlamaktır."
+    },
+    {
+        "id": 5,
+        "category": "Chapter 4 - Food Preferences and Influences",
+        "question": "Bireylerin gıda seçimlerini etkileyen 'Duyusal Veriler' (Sensory Data) arasında, biyolojik olarak en güçlü dürtü yaratan faktör hangisidir?",
+        "options": [
+            "Yemeğin sunumu ve görsel estetiği",
+            "Gıdanın lezzeti ve damak tadı hazzı",
+            "Gıdanın kokusu ve aromatik yapısı",
+            "Yemeğin dokusu ve ağızdaki hissi"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 4'te 'Determinants of Food Choice' bölümünde, lezzetin (palatability) gıda seçiminde en baskın duyusal belirleyici olduğu vurgulanmaktadır."
+    },
+    {
+        "id": 6,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Kanıta dayalı uygulama sürecinde, hakemli (peer-reviewed) bir dergide yayınlanan makalenin güvenilirliğini artıran temel özellik nedir?",
+        "options": [
+            "Makalenin çok sayıda popüler dergide alıntılanması",
+            "Bağımsız uzmanlarca yayın öncesi körlemesine incelenmesi",
+            "Yazarın sosyal medyada yüksek takipçiye sahip olması",
+            "Çalışmanın sonuçlarının kesin ve değişmez olması"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 3'te açıklandığı üzere, 'Peer-Review' süreci, çalışmanın yayınlanmadan önce tarafsız uzmanlarca metodolojik hata ve önyargı açısından denetlenmesini sağlar, bu da güvenilirliği artırır."
+    },
+    {
+        "id": 7,
+        "category": "Chapter 2 - Scope of Practice",
+        "question": "Aşağıdaki senaryolardan hangisi, bir NASM Beslenme Koçunun (CNC) 'Bilgi Verme' yetkisi dahilinde kabul edilen uygun bir eylemdir?",
+        "options": [
+            "Müşteriye haftalık detaylı yemek planı atamak",
+            "Diyabetli müşteriye karbonhidrat limiti koymak",
+            "Protein içeren gıdaların listesini paylaşmak",
+            "Kan tahlili sonuçlarını yorumlayıp analiz etmek"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: Chapter 2'de belirtilen 'Scope of Practice' sınırlarına göre, CNC'ler spesifik besin planları yazamaz ancak besin kaynakları hakkında genel eğitim ve bilgi (örneğin protein kaynakları listesi) verebilirler."
+    },
+    {
+        "id": 8,
+        "category": "Chapter 4 - Food Preferences and Influences",
+        "question": "Ekonomik belirleyicilerin gıda seçimi üzerindeki etkisine bakıldığında, düşük gelirli bireylerin beslenme tercihlerindeki en belirgin eğilim nedir?",
+        "options": [
+            "Enerji yoğunluğu yüksek, besin değeri düşük gıdalar",
+            "Meyve ve sebze ağırlıklı taze gıda tüketimi",
+            "Düşük kalorili ve yüksek lifli tahıl ürünleri",
+            "Organik sertifikalı ve işlenmemiş doğal ürünler"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Chapter 4'te (ve kaynakça 1 ve 3'te atıfta bulunulan çalışmalarda) belirtildiği üzere, ekonomik kısıtlar bireyleri genellikle ucuz, kalorisi yüksek ancak mikro besin değeri düşük işlenmiş gıdalara yöneltmektedir."
+    },
+    {
+        "id": 9,
+        "category": "Chapter 1 - Introduction to Nutrition Coaching",
+        "question": "Beslenme koçluğunda 'Müşteri Odaklı Yaklaşım' (Client-Centered Approach) benimsendiğinde, koçun temel önceliği aşağıdakilerden hangisi olmalıdır?",
+        "options": [
+            "Müşterinin yerine tüm kararları koçun alması",
+            "Koçun kendi beslenme doğrularını dikte etmesi",
+            "Müşterinin özerkliğini ve katılımını desteklemek",
+            "Sadece biyolojik verilere odaklanıp sosyalliği yok saymak"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: Chapter 1'de vurgulandığı üzere, müşteri odaklı yaklaşım, müşteriyi sürecin uzmanı olarak kabul eder ve onların özerkliğini (autonomy) ve karar süreçlerine katılımını teşvik eder."
+    },
+    {
+        "id": 10,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Bir araştırmada 'Gözlemsel Çalışma' (Observational Study) yürütülürken, araştırmacıların müdahale yetkisi hakkında hangisi doğrudur?",
+        "options": [
+            "Katılımcıların diyetlerini değiştirip sonucu izlerler",
+            "Grupları rastgele ayırıp plasebo verirler",
+            "Değişkenlere müdahale etmeden sadece veri toplarlar",
+            "Laboratuvar ortamında biyokimyasal test yaparlar"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: Chapter 3'te tanımlandığı üzere, gözlemsel çalışmalarda (Örn: Kohort çalışmaları) araştırmacılar değişkenlere müdahale etmez (manipüle etmez), sadece doğal gelişim sürecindeki verileri kaydederler."
+    },
+    {
+        "id": 11,
+        "category": "Chapter 4 - Food Preferences and Influences",
+        "question": "Bulaşıcı olmayan hastalıkların (NCDs) küresel artışında, beslenme ile ilişkili en büyük risk faktörü aşağıdakilerden hangisidir?",
+        "options": [
+            "Yetersiz protein alımına bağlı kas kaybı",
+            "İşlenmiş gıda ve hareketsiz yaşam tarzı",
+            "Vitamin takviyelerinin aşırı kullanımı",
+            "Genetik faktörlerin baskın hale gelmesi"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 4 ve ilgili Dünya Sağlık Örgütü (Source 6) verilerine göre, obezite, diyabet gibi bulaşıcı olmayan hastalıkların artışındaki temel neden sağlıksız beslenme (işlenmiş gıda) ve fiziksel inaktivitedir."
+    },
+    {
+        "id": 12,
+        "category": "Chapter 2 - Scope of Practice",
+        "question": "Bir Beslenme Koçu, müşterisinin günlük kalori ihtiyacını belirlerken hangi yöntemi kullanması yasal ve profesyonel sınırlar içindedir?",
+        "options": [
+            "Tahmini Toplam Günlük Enerji Harcaması (TDEE) hesaplaması",
+            "Bazal Metabolizma Hızını (BMR) tıbbi cihazla ölçmek",
+            "Kan değerlerine bakarak metabolik hız teşhisi koymak",
+            "Tıbbi geçmişe dayalı kesin kalori reçetesi yazmak"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Chapter 2'ye göre, CNC'ler matematiksel formüller kullanarak (Mifflin-St Jeor vb.) tahmini enerji ihtiyacını (TDEE) hesaplayabilirler, ancak tıbbi ölçüm veya reçete yapamazlar."
+    },
+    {
+        "id": 13,
+        "category": "Chapter 4 - Food Preferences and Influences",
+        "question": "'Satiety' (Tokluk) kavramı, beslenme biliminde açlık döngüsünün hangi aşamasını tanımlamak için kullanılan teknik bir terimdir?",
+        "options": [
+            "Yemek yeme isteğini başlatan biyolojik sinyal",
+            "Öğün sırasında yemeği sonlandırma kararı",
+            "İki öğün arasında geçen tokluk süresi",
+            "Midenin fiziksel olarak tamamen dolması"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: Chapter 4'te belirtildiği üzere, 'Satiation' öğünü sonlandıran histir; 'Satiety' (Tokluk) ise bir öğünün bitişinden bir sonraki öğünün başlangıcına kadar geçen, açlık hissinin bastırıldığı süredir."
+    },
+    {
+        "id": 14,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Bilimsel bir makalede 'Korelasyon nedensellik anlamına gelmez' ifadesi kullanıldığında, araştırmacı neyi vurgulamaktadır?",
+        "options": [
+            "İki değişkenin ilişkili olması, birinin diğerine neden olduğunu kanıtlamaz",
+            "Değişkenler arasında hiçbir istatistiksel ilişki bulunamamıştır",
+            "Sonuçların güvenilir olması için deneyin tekrarlanması gerekir",
+            "Çalışmanın örneklem grubu genel popülasyonu temsil etmemektedir"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Chapter 3'te 'Correlation vs Causation' bölümünde, iki değişkenin birlikte hareket etmesinin (korelasyon), birinin diğerinin sebebi olduğu (nedensellik) anlamına gelmediği, üçüncü bir değişkenin etkili olabileceği vurgulanır."
+    },
+    {
+        "id": 15,
+        "category": "Chapter 4 - Food Preferences and Influences",
+        "question": "Ventura ve Worobey'in (2013) çalışmalarında belirtildiği üzere, çocukluk çağındaki gıda tercihlerini şekillendiren en erken etki nedir?",
+        "options": [
+            "Okul kantinlerinde sunulan yemek seçenekleri",
+            "Televizyon reklamlarındaki gıda pazarlaması",
+            "Anne sütü veya formül mamanın tat profili",
+            "Akran gruplarının beslenme alışkanlıkları"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: Chapter 4 (ve Source 4 referansı) kapsamında, gıda tercihlerinin gelişimindeki en erken etkinin anne sütü veya mama yoluyla maruz kalınan tatlar olduğu belirtilmektedir."
+    },
+    {
+        "id": 16,
+        "category": "Chapter 1 - Introduction to Nutrition Coaching",
+        "question": "Aşağıdakilerden hangisi, bir Beslenme Koçunun (CNC) müşterisine sağlayabileceği 'Hesap Verebilirlik' (Accountability) desteğine örnektir?",
+        "options": [
+            "Müşterinin adına alışveriş yapıp yemek pişirmek",
+            "Haftalık kontrol görüşmeleriyle ilerlemeyi takip etmek",
+            "Müşteriyi başarısız olduğunda sertçe eleştirmek",
+            "Her öğünde ne yiyeceğine koçun karar vermesi"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 1'de koçluğun rolleri arasında, müşterinin hedeflerine ulaşması için düzenli kontrol (check-in) ve takip mekanizmalarıyla hesap verebilirlik sağlamak yer alır."
+    },
+    {
+        "id": 17,
+        "category": "Chapter 2 - Scope of Practice",
+        "question": "Güvenilir bir sağlık ve fitness profesyoneli olarak, müşterinin kullandığı reçeteli ilaçlar hakkında CNC'nin tutumu ne olmalıdır?",
+        "options": [
+            "İlacın dozajını antrenman yoğunluğuna göre ayarlamak",
+            "Yan etkileri azaltmak için ilacı bırakmasını önermek",
+            "İlaç hakkında yorum yapmadan doktoruna yönlendirmek",
+            "İlacın yerine geçecek bitkisel takviyeler önermek"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: Chapter 2'deki yasal sınırlar gereği, CNC asla reçeteli ilaçların dozajını değiştiremez, bırakılmasını öneremez veya yerine alternatif sunamaz. Bu konu tamamen hekimin yetkisindedir."
+    },
+    {
+        "id": 18,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Beslenme araştırmalarında 'Seçim Yanlılığı' (Selection Bias) riskini minimize etmek için kullanılan en etkili metodolojik araç nedir?",
+        "options": [
+            "Katılımcıların çalışmaya gönüllü olarak başvurması",
+            "Örneklem grubunun rastgele (randomizasyon) atanması",
+            "Verilerin sadece anket yoluyla toplanması",
+            "Çalışmanın süresinin mümkün olduğunca kısa tutulması"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 3'te, Selection Bias'ı önlemenin en iyi yolunun katılımcıların deney ve kontrol gruplarına rastgele (randomization) atanması olduğu belirtilir, böylece gruplar arası farklar eşitlenir."
+    },
+    {
+        "id": 19,
+        "category": "Chapter 4 - Food Preferences and Influences",
+        "question": "Yaşlanma süreciyle birlikte kalori alımındaki doğal düşüşü (Weindruch & Sohal, 1997) dengelemek için yaşlı bireylerde neye odaklanılmalıdır?",
+        "options": [
+            "Düşük hacimli ancak besin yoğunluğu yüksek gıdalara",
+            "Sindirim sistemini yormayan sadece sıvı gıdalara",
+            "Kalori açığını kapatmak için yüksek yağlı ürünlere",
+            "İştahı artırmak için şeker oranı yüksek gıdalara"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Chapter 4 (ve Source 5) bağlamında, yaşlandıkça enerji ihtiyacı azalır ancak mikro besin ihtiyacı aynı kalır veya artar. Bu yüzden 'Nutrient Dense' (Besin yoğunluğu yüksek) gıdalar tercih edilmelidir."
+    },
+    {
+        "id": 20,
+        "category": "Chapter 2 - Scope of Practice",
+        "question": "Bir müşteri size 'Ketojenik Diyet' yapmak istediğini söylediğinde, bir Beslenme Koçu olarak en uygun yaklaşımınız ne olmalıdır?",
+        "options": [
+            "Bu diyetin tehlikeli olduğunu söyleyip reddetmek",
+            "Diyetin genel artı ve eksileri hakkında kanıta dayalı bilgi vermek",
+            "Hemen detaylı bir ketojenik yemek listesi hazırlamak",
+            "Keton seviyesini ölçmesi için kan testi istemek"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 2'ye göre, koçlar belirli diyetleri reçete edemez ancak popüler diyetlerin mekanizmaları, potansiyel faydaları ve riskleri hakkında eğitim/bilgi verebilirler."
+    },
+    {
+        "id": 21,
+        "category": "Chapter 1 - Introduction to Nutrition Coaching",
+        "question": "NASM felsefesine göre, sürdürülebilir bir beslenme planının en kritik özelliği aşağıdakilerden hangisidir?",
+        "options": [
+            "Kısa sürede maksimum kilo kaybı sağlaması",
+            "Müşterinin yaşam tarzına ve tercihlerine uyumlu olması",
+            "Tüm karbonhidrat kaynaklarını tamamen çıkarması",
+            "Sadece organik ve pahalı gıdalardan oluşması"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 1'de, 'Adherence' (Uyumb) başarının anahtarı olarak tanımlanır. En iyi plan, müşterinin yaşam tarzına uyan ve uzun vadede sürdürebileceği plandır."
+    },
+    {
+        "id": 22,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Bilimsel bir çalışmanın 'Güvenilirlik' (Reliability) özelliği, o çalışmanın hangi yönünü ifade etmektedir?",
+        "options": [
+            "Çalışmanın gerçekten ölçmek istediği şeyi ölçmesi",
+            "Benzer koşullarda tekrarlandığında aynı sonuçları vermesi",
+            "Sonuçların tüm dünya nüfusuna genellenebilmesi",
+            "Araştırmacıların konu hakkında ünlü olması"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 3'teki tanımlara göre, 'Validity' (Geçerlilik) doğruluğu, 'Reliability' (Güvenilirlik) ise tutarlılığı ve tekrarlanabilirliği (reproducibility) ifade eder."
+    },
+    {
+        "id": 23,
+        "category": "Chapter 4 - Food Preferences and Influences",
+        "question": "'Sosyal Kolaylaştırma' (Social Facilitation) kavramı, beslenme davranışları bağlamında nasıl bir etki yaratır?",
+        "options": [
+            "Bireylerin yalnızken daha fazla yemek yemesi",
+            "Grup halindeyken tüketilen yiyecek miktarının artması",
+            "Sosyal baskı nedeniyle iştahın tamamen kesilmesi",
+            "Başkalarının yanında sadece sağlıklı gıda seçilmesi"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 4'te sosyal etkiler bölümünde, insanların gruplar halindeyken (arkadaş, aile vb.) yalnız oldukları zamana göre daha fazla yeme eğiliminde oldukları (Social Facilitation) açıklanır."
+    },
+    {
+        "id": 24,
+        "category": "Chapter 2 - Scope of Practice",
+        "question": "Müşterinin sağlık geçmişi formunda 'Tip 2 Diyabet' teşhisi olduğu görüldüğünde, Beslenme Koçunun ilk eylemi ne olmalıdır?",
+        "options": [
+            "Kan şekerini düşürecek bir beslenme programı yazmak",
+            "Doktorundan egzersiz ve beslenme için onay/izin istemek",
+            "İnsülin hassasiyetini artıracak takviyeler önermek",
+            "Diyabetin riskleri hakkında müşteriyi korkutmak"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 2'deki risk yönetimi protokollerine göre, kronik bir hastalığı olan müşteriyle çalışmaya başlamadan önce mutlaka doktorundan tıbbi onay (medical clearance) alınmalıdır."
+    },
+    {
+        "id": 25,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Anekdot niteliğindeki kanıtların (Örn: 'Bu diyet bende işe yaradı') bilimsel geçerliliğinin düşük olmasının temel nedeni nedir?",
+        "options": [
+            "Kişisel deneyimlerin kontrolsüz ve önyargıya açık olması",
+            "Bu tür kanıtların her zaman yalan olması",
+            "Pahalı laboratuvar testleri içermemesi",
+            "Genellikle ünlü kişiler tarafından dile getirilmesi"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Chapter 3'te, anekdotların (kişisel hikayelerin) kontrol grupları, değişken kontrolü ve genellenebilirlik içermediği için 'Kanıt Hiyerarşisi'nin en altında yer aldığı belirtilir."
+    },
+    {
+        "id": 26,
+        "category": "Chapter 1 - Introduction to Nutrition Coaching",
+        "question": "Beslenme Koçluğunda 'Önyargısız Yaklaşım' (Non-Judgmental Approach) neden kritik bir öneme sahiptir?",
+        "options": [
+            "Müşterinin koça daha fazla ücret ödemesini sağlamak için",
+            "Güven inşa etmek ve iletişimi açık tutmak için",
+            "Koçun hatalarını müşteriden gizlemek için",
+            "Sürecin ciddiyetini azaltıp eğlenceli hale getirmek için"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 1'de, etkili koçluk ilişkisinin temeli 'Rapport' (uyum/güven) inşasına dayanır. Yargılayıcı olmayan bir tutum, müşterinin dürüstçe kendini ifade etmesini ve güven duymasını sağlar."
+    },
+    {
+        "id": 27,
+        "category": "Chapter 4 - Food Preferences and Influences",
+        "question": "Gıda pazarlaması ve reklamlarının bireylerin, özellikle çocukların gıda tercihleri üzerindeki etkisi hangi kategoriye girer?",
+        "options": [
+            "Biyolojik ve genetik belirleyiciler",
+            "Psikolojik ve ruhsal belirleyiciler",
+            "Çevresel ve ekonomik belirleyiciler",
+            "Fizyolojik ve metabolik belirleyiciler"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: Chapter 4'te, reklamlar, medya ve gıda erişilebilirliği gibi faktörler 'Çevresel' (Environmental) belirleyiciler altında sınıflandırılır ve tercihler üzerinde güçlü bir dış etkendir."
+    },
+    {
+        "id": 28,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Bilimsel bir çalışmada 'Plasebo Etkisi'ni kontrol etmek için kullanılan, katılımcıların hangi grupta olduğunu bilmediği yönteme ne ad verilir?",
+        "options": [
+            "Çift-Kör (Double-Blind) Çalışma",
+            "Vaka-Kontrol (Case-Control) Çalışması",
+            "Kesitsel (Cross-Sectional) Analiz",
+            "Nitel (Qualitative) Gözlem"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Chapter 3'te, beklentilerin sonucu etkilemesini (plasebo) önlemek için hem araştırmacının hem de katılımcının kimin gerçek ilacı aldığını bilmediği 'Double-Blind' yöntem anlatılır."
+    },
+    {
+        "id": 29,
+        "category": "Chapter 2 - Scope of Practice",
+        "question": "Bir Beslenme Koçu, müşterisinin aşırı yeme bozukluğu (Binge Eating Disorder) belirtileri gösterdiğini fark ederse ne yapmalıdır?",
+        "options": [
+            "Yeme bozukluğunu tedavi etmek için terapi uygulamak",
+            "Müşteriyi derhal bir ruh sağlığı uzmanına sevk etmek",
+            "Daha sıkı bir diyet programı ile yemesini kısıtlamak",
+            "Bu durumu görmezden gelip egzersize odaklanmak"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 2'de, yeme bozuklukları (Eating Disorders) psikiyatrik durumlardır ve CNC'nin yetki alanı dışındadır. Kesinlikle uzman bir psikolog veya psikiyatriste sevk (referral) gerektirir."
+    },
+    {
+        "id": 30,
+        "category": "Chapter 4 - Food Preferences and Influences",
+        "question": "Bireyin aç olmadığı halde, stres veya üzüntü gibi duygusal tetikleyicilerle yemek yemesi durumu literatürde nasıl adlandırılır?",
+        "options": [
+            "Homeostatik Yeme (Biyolojik ihtiyaç)",
+            "Duygusal Yeme (Hedonistik olmayan)",
+            "Sosyal Yeme (Grup etkileşimi)",
+            "Sezgisel Yeme (Vücudu dinleme)"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 4'te (ve Source 7-8 referanslı konularda), fizyolojik açlık olmadan duygusal durumları yönetmek için yeme davranışı 'Emotional Eating' olarak tanımlanır."
+    },
+    {
+        "id": 31,
+        "category": "Chapter 1 - Introduction to Nutrition Coaching",
+        "question": "Kayıtlı Diyetisyenler (RDN) ile Beslenme Koçları (CNC) arasındaki temel eğitim farkı aşağıdakilerden hangisidir?",
+        "options": [
+            "CNC'lerin tıp fakültesi mezunu olması zorunludur",
+            "RDN'lerin üniversite derecesi ve klinik staj zorunluluğu vardır",
+            "Her iki grup da aynı akademik eğitimi alır",
+            "CNC'ler sadece hastanelerde çalışabilirler"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 1'de, RDN'lerin akredite bir üniversite lisans programını ve 1200+ saatlik denetimli klinik stajı tamamlaması gerektiği, CNC'lerin ise sertifikasyon odaklı olduğu belirtilir."
+    },
+    {
+        "id": 32,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Bir beslenme iddiasının doğruluğunu değerlendirirken 'Confirmation Bias' (Doğrulama Yanlılığı) riskine düşmemek için ne yapılmalıdır?",
+        "options": [
+            "Sadece kendi görüşümüzü destekleyen makaleleri okumak",
+            "Kanıtları, kendi inançlarımıza zıt olsa bile objektif değerlendirmek",
+            "Popüler sosyal medya fenomenlerinin görüşlerine güvenmek",
+            "Sonucu önceden belirleyip ona göre veri aramak"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 3'te, Confirmation Bias, sadece inançlarımızı doğrulayan verileri seçme hatasıdır. Bilimsel düşünce, karşıt kanıtları da dürüstçe değerlendirmeyi gerektirir."
+    },
+    {
+        "id": 33,
+        "category": "Chapter 2 - Scope of Practice",
+        "question": "Bir Beslenme Koçunun, müşterisine pişirme teknikleri (ızgara, haşlama vb.) hakkında tavsiye vermesi yasal mıdır?",
+        "options": [
+            "Hayır, bu sadece aşçıların yetki alanındadır",
+            "Evet, sağlıklı gıda hazırlama eğitimi kapsamındadır",
+            "Hayır, bu tıbbi beslenme tedavisine girer",
+            "Evet, ancak sadece çiğ beslenme önerilebilir"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 2'de 'Scope of Practice' dahilinde, CNC'lerin gıda hazırlama yöntemleri, sağlıklı pişirme teknikleri ve alışveriş turları gibi konularda eğitim verebileceği açıkça belirtilir."
+    },{
+        "id": 34,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Bilimsel araştırma piramidinin en tepesinde yer alan ve belirli bir konu hakkındaki tüm yüksek kaliteli çalışmaları sentezleyen yöntem hangisidir?",
+        "options": [
+            "Randomize Kontrollü Denemeler (RCT)",
+            "Sistematik Derlemeler ve Meta-Analizler",
+            "Gözlemsel Kesitsel Araştırma Analizleri",
+            "Uzman Görüşleri ve Editoryal Yazılar"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 3'teki 'Hierarchy of Evidence' tablosunda, Sistematik Derlemeler ve Meta-Analizler, kanıt gücü en yüksek olan ve piramidin zirvesinde yer alan araştırma türüdür."
+    },
+    {
+        "id": 35,
+        "category": "Chapter 1 - Introduction to Nutrition Coaching",
+        "question": "Kanıta Dayalı Uygulama (Evidence-Based Practice) yaklaşımı, kararların alınmasında aşağıdaki üç bileşenden hangilerinin kesişimini temel alır?",
+        "options": [
+            "Araştırma Kanıtları, Kişisel Deneyim, Müşteri Tercihleri",
+            "Sosyal Medya Trendleri, Diyet Kitapları, Ünlü Tavsiyeleri",
+            "Laboratuvar Testleri, Genetik Analizler, Tıbbi Reçeteler",
+            "Antrenör Görüşü, Spor Salonu Kuralları, Ekipman Verisi"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Chapter 1'de tanımlandığı üzere, Kanıta Dayalı Uygulama; (1) En iyi araştırma kanıtları, (2) Uzmanın kişisel deneyimi ve (3) Müşterinin değerleri/tercihlerinin birleşimidir."
+    },
+    {
+        "id": 36,
+        "category": "Chapter 2 - Scope of Practice",
+        "question": "Müşterinin belirli bir besin takviyesini (supplement) kullanıp kullanmama konusundaki sorusuna, CNC yasal olarak nasıl yaklaşmalıdır?",
+        "options": [
+            "Marka verip hemen satın almasını önermek",
+            "Dozaj belirleyerek reçete gibi yazdırmak",
+            "Kanıtlanmış etki ve güvenliği hakkında bilgi vermek",
+            "Tüm takviyelerin zararlı olduğunu söyleyip yasaklamak"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: Chapter 2'ye göre, CNC takviye reçete edemez ancak takviyelerin içerikleri, potansiyel faydaları ve güvenlik profilleri hakkında kanıta dayalı eğitim/bilgi verebilir."
+    },
+    {
+        "id": 37,
+        "category": "Chapter 4 - Food Preferences and Influences",
+        "question": "Gıda seçiminde 'Ekonomik Belirleyiciler' incelendiğinde, enerji yoğunluğu yüksek (kalorili) gıdalarla ilgili temel gözlem nedir?",
+        "options": [
+            "Genellikle düşük kalorili gıdalardan daha pahalıdırlar",
+            "Besin değerleri çok yüksek ve maliyetleri düşüktür",
+            "Düşük gelirli gruplar tarafından daha az tercih edilirler",
+            "Genellikle besin değeri yüksek gıdalardan daha ucuzdurlar"
+        ],
+        "correct": 3,
+        "explanation": "ANALİZ: Chapter 4'te belirtildiği üzere, rafine tahıllar, şeker ve yağ eklenmiş gıdalar (enerji yoğunluğu yüksek), taze sebze ve meyvelere (besin yoğunluğu yüksek) göre genellikle daha ucuzdur."
+    },
+    {
+        "id": 38,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Bir ölçüm aracının (örneğin bir tartı) her seferinde aynı sonucu vermesi ancak bu sonucun gerçek ağırlıktan 2 kg fazla olması durumu neyi gösterir?",
+        "options": [
+            "Araç güvenilirdir (Reliable) ancak geçerli (Valid) değildir",
+            "Araç hem geçerlidir (Valid) hem de güvenilirdir (Reliable)",
+            "Araç geçerlidir (Valid) ancak güvenilir (Reliable) değildir",
+            "Araç ne geçerlidir (Valid) ne de güvenilirdir (Reliable)"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Chapter 3'teki tanımlara göre; tutarlı sonuç vermesi 'Reliability' (Güvenilirlik), doğru sonucu vermesi 'Validity' (Geçerlilik) dir. Yanlış ama tutarlı ölçüm, güvenilir ama geçersizdir."
+    },
+    {
+        "id": 39,
+        "category": "Chapter 4 - Food Preferences and Influences",
+        "question": "Kişinin çocukluğunda maruz kaldığı kültürel yemek alışkanlıklarının yetişkinlikteki tercihlerini etkilemesi hangi faktör kategorisine girer?",
+        "options": [
+            "Biyolojik ve Fizyolojik Faktörler",
+            "Ekonomik ve Yapısal Faktörler",
+            "Sosyal ve Kültürel Faktörler",
+            "Psikolojik ve Duygusal Faktörler"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: Chapter 4'te, aile gelenekleri, dini inançlar ve kültürel normlar, gıda tercihlerini şekillendiren 'Sosyal ve Kültürel Belirleyiciler' başlığı altında incelenir."
+    },
+    {
+        "id": 40,
+        "category": "Chapter 2 - Scope of Practice",
+        "question": "Tıbbi Beslenme Tedavisi (Medical Nutrition Therapy - MNT) ile Beslenme Koçluğu arasındaki temel yasal ayrım nedir?",
+        "options": [
+            "MNT sadece sağlıklı bireylere uygulanır",
+            "Koçluk sadece hasta bireylere uygulanır",
+            "MNT hastalık yönetimi ve tedavisini kapsar",
+            "Koçluk ilaç dozajlarını ayarlayabilir"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: Chapter 2'de kesin bir dille belirtildiği üzere, MNT hastalıkların tedavisi ve yönetimi içindir ve sadece RD/Doktor yetkisindedir. Koçluk ise sağlıklı yaşam ve davranış değişikliği odaklıdır."
+    },
+    {
+        "id": 41,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Bir makalenin 'Özet' (Abstract) bölümü, okuyucuya çalışmayla ilgili hangi temel bilgiyi hızlıca sunmayı amaçlar?",
+        "options": [
+            "Araştırmacıların tüm akademik özgeçmişleri",
+            "Çalışmanın amacı, yöntemi ve ana bulguları",
+            "Konuyla ilgili yazılmış tüm diğer makaleler",
+            "Araştırmanın bütçesi ve sponsorluk detayları"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 3'te makale yapısı anlatılırken, Abstract bölümünün çalışmanın kısa bir özeti olduğu; amaç, yöntem, sonuçlar ve ana çıkarımları içerdiği belirtilir."
+    },
+    {
+        "id": 42,
+        "category": "Chapter 1 - Introduction to Nutrition Coaching",
+        "question": "Beslenme Koçluğunda 'Empati' (Empathy) göstermek, müşteri ile kurulan ilişkide profesyonel olarak ne anlama gelir?",
+        "options": [
+            "Müşterinin duygularını anlayıp onunla aynı hissi paylaşmak",
+            "Müşterinin her dediğini onaylayıp sorumluluğu almak",
+            "Müşteriye acıyarak onun yerine hedefleri belirlemek",
+            "Duygusal mesafe koyarak sadece verilere odaklanmak"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Chapter 1'de, empatinin müşterinin bakış açısını anlama yeteneği olduğu ve güven (rapport) inşası için kritik olduğu vurgulanır."
+    },
+    {
+        "id": 43,
+        "category": "Chapter 2 - Scope of Practice",
+        "question": "Aşağıdaki durumlardan hangisi, bir Beslenme Koçunun müşterisini 'Acil Durum' (Red Flag) kapsamında sevk etmesini gerektirmez?",
+        "options": [
+            "Müşterinin günlük su tüketimini artırmak istemesi",
+            "Ani ve açıklanamayan şiddetli karın ağrıları",
+            "Kısa sürede aşırı ve istemsiz kilo kaybı",
+            "Yeme bozukluğunu işaret eden kusma davranışları"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Chapter 2'deki sevk kriterlerine göre; ağrı, açıklanamayan kilo kaybı ve yeme bozukluğu semptomları tıbbi sevk gerektirir. Su tüketimi ise koçluk kapsamındadır."
+    },
+    {
+        "id": 44,
+        "category": "Chapter 4 - Food Preferences and Influences",
+        "question": "'Gıda Çölleri' (Food Deserts) kavramı, bireylerin beslenme kalitesini etkileyen hangi çevresel faktörü tanımlar?",
+        "options": [
+            "Sağlıklı ve taze gıdaya erişimin kısıtlı olduğu bölgeler",
+            "Sadece tatlı ve çöl bitkilerinin satıldığı pazarlar",
+            "Restoran sayısının market sayısından fazla olduğu yerler",
+            "Tarımsal üretimin yapılamadığı kurak iklim bölgeleri"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Chapter 4'te (ve Source 3), taze ve sağlıklı gıdaya fiziksel veya ekonomik erişimin zor olduğu bölgeler 'Food Deserts' olarak tanımlanır ve bu durum obezite ile ilişkilendirilir."
+    },
+    {
+        "id": 45,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Bilimsel bir çalışmada, sonucu etkileyebilecek ancak araştırmacının kontrol etmediği dış faktörlere ne ad verilir?",
+        "options": [
+            "Bağımsız Değişkenler (Independent Variables)",
+            "Karıştırıcı Değişkenler (Confounding Variables)",
+            "Bağımlı Değişkenler (Dependent Variables)",
+            "Plasebo Değişkenleri (Placebo Variables)"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 3'te, deneyin sonucunu bozabilecek veya yanıltıcı ilişki kurabilecek kontrol dışı etkenler 'Confounding Variables' olarak tanımlanır."
+    },
+    {
+        "id": 46,
+        "category": "Chapter 2 - Scope of Practice",
+        "question": "Gizlilik yasaları (örneğin ABD'de HIPAA) kapsamında, bir CNC müşterisinin bilgilerini hangi durumda üçüncü şahıslarla paylaşabilir?",
+        "options": [
+            "Müşteri sporda başarılı olduğunda reklam amacıyla",
+            "Müşterinin yazılı ve açık izni/onayı alındığında",
+            "Müşterinin eşi sonuçları merak edip sorduğunda",
+            "Spor salonundaki diğer üyeler talep ettiğinde"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 2'deki etik ve yasal kurallara göre, müşteri verileri gizlidir (Confidentiality). Sadece müşterinin açık, yazılı izni (written consent) olduğunda paylaşılabilir."
+    },
+    {
+        "id": 47,
+        "category": "Chapter 4 - Food Preferences and Influences",
+        "question": "Proteinlerin 'Tokluk' (Satiety) üzerindeki etkisi, karbonhidratlar ve yağlarla kıyaslandığında nasıldır?",
+        "options": [
+            "Proteinler, yağlara göre daha az tokluk hissi verir",
+            "Proteinler, en yüksek tokluk etkisine sahip besin grubudur",
+            "Karbonhidratlar, proteinlerden daha uzun süre tok tutar",
+            "Tüm makro besinlerin tokluk etkisi birebir aynıdır"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 4'te makro besinlerin tokluk etkileri tartışılırken, proteinin birim kalori başına en yüksek tokluk (satiety) sağlayan besin olduğu belirtilir."
+    },
+    {
+        "id": 48,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Nitel (Qualitative) araştırmalar, Nicel (Quantitative) araştırmalardan temel olarak hangi yönüyle ayrılır?",
+        "options": [
+            "Sadece sayısal verilere ve istatistiğe odaklanması",
+            "Katılımcıların deneyimlerini ve görüşlerini incelemesi",
+            "Daha büyük örneklem gruplarıyla çalışması",
+            "Laboratuvar ortamında kesin ölçümler yapması"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 3'te, Nicel araştırmaların sayısal veriye (numbers), Nitel araştırmaların ise insanların deneyim, görüş ve motivasyonlarına (words/experiences) odaklandığı belirtilir."
+    },
+    {
+        "id": 49,
+        "category": "Chapter 1 - Introduction to Nutrition Coaching",
+        "question": "Bir Beslenme Koçunun, kendi bilgi ve yetkinlik sınırlarını aşan bir durumla karşılaştığında yapması gereken en profesyonel davranış nedir?",
+        "options": [
+            "Konuyu internetten araştırıp hemen çözüm üretmek",
+            "Müşteriye durumu hissettirmeden geçiştirmek",
+            "Yetkili bir uzmana (Doktor/Diyetisyen) sevk etmek",
+            "Deneme yanılma yöntemiyle bir tedavi uygulamak"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: Chapter 1 ve 2'de, 'Scope of Practice' dışına çıkan durumlarda profesyonel etik gereği mutlaka 'Referral' (Sevk) mekanizmasının işletilmesi gerektiği vurgulanır."
+    },
+    {
+        "id": 50,
+        "category": "Chapter 4 - Food Preferences and Influences",
+        "question": "Beslenme psikolojisinde 'Hedonik Açlık' (Hedonic Hunger) kavramı neyi ifade eder?",
+        "options": [
+            "Vücudun enerji ihtiyacından doğan fiziksel açlık",
+            "Zevk ve haz alma amacıyla yemek yeme dürtüsü",
+            "Kan şekeri düştüğünde oluşan titreme hissi",
+            "Midenin boşalmasıyla oluşan guruldama sesi"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 4'te, 'Homeostatic Hunger' enerji ihtiyacı iken, 'Hedonic Hunger'ın tamamen lezzet ve haz (pleasure) odaklı yeme isteği olduğu açıklanır."
+    },
+    {
+        "id": 51,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Bir araştırmanın sonuçlarının, çalışmaya dahil edilmeyen genel popülasyona da uygulanabilir olma özelliğine ne denir?",
+        "options": [
+            "Genellenebilirlik (Generalizability)",
+            "Doğrulama Yanlılığı (Confirmation Bias)",
+            "Plasebo Etkisi (Placebo Effect)",
+            "İç Geçerlilik (Internal Validity)"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Chapter 3'te, bir çalışmanın örneklem grubundan elde edilen verilerin, daha geniş kitleler (external validity) için de geçerli olması durumu 'Generalizability' olarak tanımlanır."
+    },
+    {
+        "id": 52,
+        "category": "Chapter 2 - Scope of Practice",
+        "question": "Aşağıdakilerden hangisi, bir Beslenme Koçunun müşterisine sunabileceği 'Yemek Hazırlama' (Meal Prep) tavsiyeleri kapsamında değildir?",
+        "options": [
+            "Haftalık alışveriş listesi oluşturma teknikleri",
+            "Sebzelerin besin değerini koruyan pişirme yöntemleri",
+            "Öğünleri önceden kaplara bölme stratejileri",
+            "Kişiye özel gramajlarla zorunlu menü dayatması"
+        ],
+        "correct": 3,
+        "explanation": "ANALİZ: Chapter 2'ye göre; alışveriş, pişirme ve planlama stratejileri (A, B, C) koçluk kapsamındadır. Ancak zorunlu ve kesin gramajlı menü dayatmak (D) reçete yazmaya girer."
+    },
+    {
+        "id": 53,
+        "category": "Chapter 4 - Food Preferences and Influences",
+        "question": "Reklamcılıkta kullanılan 'Pazarlama' tekniklerinin, özellikle çocuklar üzerindeki etkisi düşünüldüğünde, hangi gıda grubu daha çok öne çıkar?",
+        "options": [
+            "Lif oranı yüksek tam tahıllı ürünler",
+            "Şeker, yağ ve tuz oranı yüksek işlenmiş gıdalar",
+            "Yerel üreticilerin taze sebze ve meyveleri",
+            "Protein açısından zengin baklagil çeşitleri"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 4'te (ve Source 1), gıda pazarlamasının genellikle çocukları hedeflediği ve 'High fat, sugar, and salt' (Yüksek yağ, şeker, tuz) içeren ürünleri teşvik ettiği belirtilir."
+    },
+    {
+        "id": 54,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Bilimsel yayınlarda 'Çıkar Çatışması' (Conflict of Interest) beyanı neden zorunludur?",
+        "options": [
+            "Araştırmacının finansal bağlantılarının sonucu etkileyip etkilemediğini görmek için",
+            "Yazarların akademik unvanlarını okuyucuya tanıtmak için",
+            "Derginin sayfa sayısını artırarak daha kalın görünmesini sağlamak için",
+            "Araştırmanın ne kadar sürede tamamlandığını belgelemek için"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Chapter 3'te, araştırmayı finanse eden şirketlerin (örn: gıda firmaları) sonuçlar üzerinde yanlılık yaratabileceği, bu yüzden 'Conflict of Interest' beyanının şeffaflık için şart olduğu anlatılır."
+    },
+    {
+        "id": 55,
+        "category": "Chapter 1 - Introduction to Nutrition Coaching",
+        "question": "Bir Beslenme Koçunun, müşterinin hedeflerine ulaşamaması durumunda takınması gereken en yapıcı tavır nedir?",
+        "options": [
+            "Müşteriyi iradesizlikle suçlayıp çalışmayı bırakmak",
+            "Süreci analiz edip engelleri birlikte tanımlamak",
+            "Hedefleri değiştirmeden aynı planda ısrar etmek",
+            "Müşterinin yerine diyeti kendisinin yapması"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 1'deki koçluk yaklaşımına göre, başarısızlık durumunda suçlama değil; merak, analiz ve işbirliği ile engelleri (barriers) tanımlayıp strateji değiştirmek esastır."
+    },
+    {
+        "id": 56,
+        "category": "Chapter 2 - Scope of Practice",
+        "question": "Bir müşteri 'Glutensiz Diyet' yapıp yapmaması gerektiğini sorduğunda, CNC'nin vereceği en uygun cevap hangisidir?",
+        "options": [
+            "Herkes için zararlıdır, kesinlikle gluteni kesmelisin",
+            "Gluten sadece çölyak hastaları için risklidir, tıbbi test öneririm",
+            "Glutensiz diyet zayıflamanın tek ve kesin yoludur",
+            "Bu konuda yorum yapamam, internetten araştırmalısın"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 2'ye göre, CNC popüler diyetler hakkında bilgi verebilir. Glutenin tıbbi bir durum (Çölyak) ile ilişkisi olduğunu belirtip, teşhis için doktora yönlendirmek en doğrusudur."
+    },
+    {
+        "id": 57,
+        "category": "Chapter 4 - Food Preferences and Influences",
+        "question": "'Duyu' (Sensory) faktörleri arasında, bir gıdanın tercih edilmesinde 'Tat' (Taste) duyusundan sonra en etkili olan ikinci faktör hangisidir?",
+        "options": [
+            "Gıdanın markası ve ambalajı",
+            "Gıdanın kokusu (Olfactory)",
+            "Gıdanın fiyat etiketi",
+            "Gıdanın reklam müziği"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 4'te duyusal özellikler sıralanırken, koku (smell/olfactory) duyusunun tat alma ile doğrudan bağlantılı olduğu ve lezzet algısını belirleyen en önemli ikinci faktör olduğu vurgulanır."
+    },
+    {
+        "id": 58,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Bilimsel bir hipotezin, geçerli bir teoriye dönüşebilmesi için geçmesi gereken en kritik süreç nedir?",
+        "options": [
+            "Tek bir deneyle doğrulanması yeterlidir",
+            "Tekrarlanan testler ve bağımsız çalışmalarla doğrulanması",
+            "Ünlü bir bilim insanı tarafından ortaya atılması",
+            "Sosyal medyada çok sayıda beğeni alması"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 3'teki Bilimsel Yöntem akışına göre, bir hipotez ancak tekrarlanan deneyler (replication) ve bağımsız doğrulamalar sonucunda güçlü bir teori haline gelir."
+    },
+    {
+        "id": 59,
+        "category": "Chapter 2 - Scope of Practice",
+        "question": "Beslenme Koçunun (CNC), bir Spor Salonu (Gym) ortamında Spor Eğitmeni (CPT) ile işbirliği yapmasının müşteriye sağladığı temel fayda nedir?",
+        "options": [
+            "Müşterinin kafasının karışmasını sağlamak",
+            "Beslenme ve egzersizin bütüncül bir planla yönetilmesi",
+            "Müşteriden iki kat ücret talep edebilmek",
+            "Sorumluluğu birbirinin üzerine atmak"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 2'de disiplinler arası çalışma (Interdisciplinary) teşvik edilir. CPT egzersizi, CNC beslenmeyi yöneterek müşteriye 'Bütüncül' (Holistic) bir sağlık yaklaşımı sunar."
+    },
+    {
+        "id": 60,
+        "category": "Chapter 4 - Food Preferences and Influences",
+        "question": "Beslenme alışkanlıklarının oluşumunda 'Rol Model' etkisi düşünüldüğünde, ebeveynlerin çocuklar üzerindeki etkisi nasıldır?",
+        "options": [
+            "Ebeveynlerin ne yediği çocukların tercihlerini etkilemez",
+            "Çocuklar ebeveynlerinin yediklerini taklit etme eğilimindedir",
+            "Çocuklar her zaman ebeveynlerinin tam tersini yerler",
+            "Sadece televizyon karakterleri rol model olabilir"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 4'te (ve Source 4), ebeveynlerin yeme davranışlarının çocuklar için birincil model olduğu ve çocukların bu alışkanlıkları taklit ettiği (modeling) belirtilir."
+    },
+    {
+        "id": 61,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Bir makalede 'Vaka Çalışması' (Case Study) yönteminin kullanılması, o çalışmanın kanıt gücü hakkında ne ifade eder?",
+        "options": [
+            "Kanıt gücü en yüksek, genellenebilir bir çalışmadır",
+            "Sadece tek bir birey veya küçük grubu inceleyen, düşük kanıtlıdır",
+            "Binlerce kişilik katılımcı grubuyla yapılmıştır",
+            "Neden-sonuç ilişkisini kesin olarak kanıtlar"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 3'teki hiyerarşide, Vaka Çalışmaları (Case Studies) piramidin alt kısımlarındadır. Tekil olayları incelediği için genellenebilirliği düşüktür ve zayıf kanıt sayılır."
+    },
+    {
+        "id": 62,
+        "category": "Chapter 1 - Introduction to Nutrition Coaching",
+        "question": "Sürekli Eğitim (Continuing Education) bir Beslenme Koçu için neden zorunlu ve kritik bir gerekliliktir?",
+        "options": [
+            "Beslenme bilimi sürekli değiştiği ve geliştiği için",
+            "Sadece sertifika süresini uzatmak için",
+            "Müşterilere daha pahalı hizmet satabilmek için",
+            "Eski bilgilerin her zaman doğru olduğunu kanıtlamak için"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Chapter 1'de, beslenme biliminin dinamik olduğu (constantly evolving), bu yüzden güncel kalmak ve yanlış bilgileri düzeltmek için sürekli eğitimin şart olduğu vurgulanır."
+    },
+    {
+        "id": 63,
+        "category": "Chapter 2 - Scope of Practice",
+        "question": "Bir CNC'nin, müşterisine 'Detoks Çayları' satarak bunlardan komisyon alması, NASM etik kuralları çerçevesinde nasıl değerlendirilir?",
+        "options": [
+            "Ek gelir sağladığı için teşvik edilen bir davranıştır",
+            "Kanıtlanmamış ürünleri finansal çıkar için önermek etik dışıdır",
+            "Müşteri istediği sürece her şey satılabilir",
+            "Sadece bitkisel ürünler olduğu için sorun teşkil etmez"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 2'deki etik kodlara (Code of Ethics) göre, profesyoneller finansal çıkar (conflict of interest) uğruna bilimsel kanıtı olmayan veya güvenliği şüpheli ürünleri müşteriye dayatmamalıdır."
+    },
+    {
+        "id": 64,
+        "category": "Chapter 4 - Food Preferences and Influences",
+        "question": "Yiyeceklerin 'Doku' (Texture) özellikleri (kıtır, yumuşak, sıvı vb.) gıda tercihinde hangi duyusal kategori altında incelenir?",
+        "options": [
+            "Görsel (Visual) Algı",
+            "İşitsel (Auditory) Algı",
+            "Dokunsal (Somatosensory/Mouthfeel) Algı",
+            "Kokusual (Olfactory) Algı"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: Chapter 4'te, gıdaların ağızdaki hissi (mouthfeel) ve dokusu, lezzet algısını tamamlayan 'Somatosensory' (Dokunsal) bir veri olarak tanımlanır."
+    },
+    {
+        "id": 65,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Bilimsel okuryazarlıkta 'Örneklem Büyüklüğü'nün (Sample Size) küçük olması (Örn: 5 kişi), çalışmanın sonucuyla ilgili nasıl bir risk yaratır?",
+        "options": [
+            "Sonuçların tesadüfi olma ihtimalini artırır",
+            "Çalışmanın kalitesini ve kesinliğini artırır",
+            "Daha detaylı analiz yapılmasına olanak tanır",
+            "İstatistiksel olarak daha güvenilir sonuç verir"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Chapter 3'te, küçük örneklem gruplarının (Small Sample Size) istatistiksel gücü azalttığı ve sonuçların tesadüfi (by chance) olma riskini artırdığı belirtilir."
+    },
+    {
+        "id": 66,
+        "category": "Chapter 2 - Scope of Practice",
+        "question": "Müşteri ile yapılan ilk görüşmede imzalanan 'Feragatname' (Waiver/Release of Liability) formu, koçu yasal olarak neyden korumayı amaçlar?",
+        "options": [
+            "Koçun bilerek yaptığı hatalardan doğacak zararlardan",
+            "Müşterinin koçluk sürecindeki olası riskleri kabul etmesinden",
+            "Koçun müşteriye hakaret etme hakkından",
+            "Müşterinin ücret ödememe ihtimalinden"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 2'de yasal belgeler anlatılırken, Waiver formunun müşteriyi potansiyel riskler hakkında bilgilendirdiği ve koçu standart uygulama risklerine karşı koruduğu belirtilir."
+    },{
+        "id": 67,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Bilimsel Yöntem (Scientific Method) döngüsünün 'Sonuç' (Conclusion) aşamasında, araştırmacıların elde ettikleri verilerle yapması gereken temel işlem nedir?",
+        "options": [
+            "Hipotezi destekleyip desteklemediğini değerlendirmek",
+            "Deneyi baştan sona değiştirip tekrarlamak",
+            "Sadece olumlu sonuçları yayınlamak",
+            "Katılımcıların kişisel görüşlerini almak"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Chapter 3'teki Bilimsel Yöntem şemasında, son adım verilerin analiz edilip hipotezin doğrulanıp doğrulanmadığına karar verilmesi (conclusion) sürecidir."
+    },
+    {
+        "id": 68,
+        "category": "Chapter 2 - Scope of Practice",
+        "question": "Bir Beslenme Koçunun, müşterisinin 'Bulimia Nervoza' belirtileri (tıkınırcasına yeme ve kusma) gösterdiğinden şüphelendiğinde izlemesi gereken protokol nedir?",
+        "options": [
+            "Müşteriyi kusmanın zararları konusunda uyarmak",
+            "Diyetindeki kaloriyi artırarak krizi önlemek",
+            "Acilen bir klinik psikolog veya hekime sevk etmek",
+            "Egzersiz sıklığını artırarak kaloriyi yaktırmak"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: Chapter 2'de, yeme bozukluklarının (Eating Disorders) kesinlikle CNC yetki alanı dışında olduğu ve uzman bir ruh sağlığı profesyoneline sevk (referral) gerektirdiği belirtilir."
+    },
+    {
+        "id": 69,
+        "category": "Chapter 4 - Food Preferences and Influences",
+        "question": "Vücudun enerji dengesini korumak için beyne gönderdiği açlık ve tokluk sinyallerinin bütününe ne ad verilir?",
+        "options": [
+            "Homeostatik Yeme Dürtüsü",
+            "Hedonistik Yeme Arzusu",
+            "Çevresel Yeme Tetikleyicisi",
+            "Sosyal Yeme Davranışı"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Chapter 4'te, vücudun enerji ihtiyacına dayalı biyolojik yeme sinyalleri 'Homeostatic Eating' (Homeostatik Yeme) olarak tanımlanır, zevk odaklı olan ise Hedoniktir."
+    },
+    {
+        "id": 70,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Randomize Kontrollü Denemeler (RCT) tasarlanırken, katılımcıların hangi gruba atandığını bilmemesi (körleme) neden kritik bir öneme sahiptir?",
+        "options": [
+            "Araştırma maliyetlerini düşürmek için",
+            "Plasebo etkisini ve beklenti yanlılığını önlemek için",
+            "Daha fazla katılımcı bulabilmek için",
+            "Etik kurul onayı alabilmek için"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 3'te, katılımcıların tedavi mi yoksa plasebo mu aldığını bilmemesinin (Blinding), psikolojik beklentilerin sonucu etkilemesini (Placebo Effect) engellediği anlatılır."
+    },
+    {
+        "id": 71,
+        "category": "Chapter 1 - Introduction to Nutrition Coaching",
+        "question": "Müşteri odaklı koçlukta, müşterinin kendi kararlarını verme hakkına ve sürecin kontrolünü elinde tutmasına ne ad verilir?",
+        "options": [
+            "Otorite (Authority)",
+            "Özerklik (Autonomy)",
+            "Bağımlılık (Dependency)",
+            "İtaat (Obedience)"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 1'de, etkili koçluğun temel taşlarından birinin müşterinin 'Autonomy' (Özerklik) duygusunu desteklemek olduğu vurgulanır."
+    },
+    {
+        "id": 72,
+        "category": "Chapter 4 - Food Preferences and Influences",
+        "question": "Çocuklara yönelik gıda pazarlamasında en sık kullanılan strateji, hangi tür ürünlerin tüketimini artırmayı hedefler?",
+        "options": [
+            "Düşük kalorili sebze yemekleri",
+            "Yüksek şekerli ve yağlı atıştırmalıklar",
+            "Protein ağırlıklı ana öğünler",
+            "Vitamin yönünden zengin meyve suları"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 4'te (ve kaynakça), gıda endüstrisinin çocuklar üzerindeki pazarlama taktiklerinin yoğunlukla 'High sugar, fat, sodium' içeren ürünlere odaklandığı belirtilir."
+    },
+    {
+        "id": 73,
+        "category": "Chapter 2 - Scope of Practice",
+        "question": "Bir CNC, müşterisine besin takviyesi (supplement) önerirken ürünün güvenilirliğini teyit etmek için hangi sertifikayı aramalıdır?",
+        "options": [
+            "Ürünün en çok satanlar listesinde olması",
+            "Üçüncü taraf (Third-Party) test onayı (Örn: NSF, Informed Choice)",
+            "Sosyal medyada ünlü sporcuların kullanması",
+            "Ambalajın üzerinde 'Doğal' ibaresinin bulunması"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 2'de, takviye güvenliği için bağımsız laboratuvarlarca (Third-Party Testing) yapılan testlerin ve sertifikaların (NSF, USP vb.) aranması gerektiği belirtilir."
+    },
+    {
+        "id": 74,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Akademik bir dergide makale yayınlanmadan önce yapılan 'Hakem Değerlendirmesi' (Peer Review) sürecinin temel amacı nedir?",
+        "options": [
+            "Makalenin yazım hatalarını düzeltmek",
+            "Çalışmanın bilimsel geçerliliğini ve kalitesini denetlemek",
+            "Yazara para kazandırmak",
+            "Derginin sayfa sayısını doldurmak"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 3'te, Peer Review sürecinin, çalışmanın metodolojisinin, analizinin ve sonuçlarının alanındaki uzmanlarca kalite kontrolünden geçirilmesi olduğu açıklanır."
+    },
+    {
+        "id": 75,
+        "category": "Chapter 4 - Food Preferences and Influences",
+        "question": "Bireyin içinde bulunduğu fiziksel çevrenin (ev, iş yeri, okul) gıda seçimlerini yönlendirmesi hangi faktör grubuna girer?",
+        "options": [
+            "Genetik Faktörler",
+            "Biyolojik Faktörler",
+            "Çevresel Faktörler",
+            "Kişisel Faktörler"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: Chapter 4'te, gıdaya erişim, bulunabilirlik ve fiziksel ortamın etkileri 'Environmental Determinants' (Çevresel Belirleyiciler) başlığı altında incelenir."
+    },
+    {
+        "id": 76,
+        "category": "Chapter 1 - Introduction to Nutrition Coaching",
+        "question": "Bir Beslenme Koçunun (CNC), müşterisine 'Diyetisyen' (Dietitian) unvanıyla hizmet vermesi neden yasaktır?",
+        "options": [
+            "Çünkü diyetisyenlik lisans gerektiren yasal olarak korunmuş bir unvandır",
+            "Çünkü koçlar sadece spor salonunda çalışabilirler",
+            "Çünkü diyetisyenler sadece hastalarla çalışır",
+            "Çünkü koçluk eğitimi diyetisyenlikten daha üstündür"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Chapter 1'de, 'Registered Dietitian' (RD) unvanının yasal koruma altında olduğu ve sadece gerekli akademik ve lisans şartlarını sağlayanların kullanabileceği belirtilir."
+    },
+    {
+        "id": 77,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "İki değişken arasında 'Pozitif Korelasyon' (Positive Correlation) bulunması, istatistiksel olarak ne anlama gelir?",
+        "options": [
+            "Bir değişken artarken diğerinin azaldığı",
+            "İki değişkenin birbirinden tamamen bağımsız olduğu",
+            "Bir değişken artarken diğerinin de arttığı",
+            "Değişkenler arasında hiçbir ilişki olmadığı"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: Chapter 3'teki istatistiksel kavramlarda, pozitif korelasyonun değişkenlerin aynı yönde hareket etmesi (biri artarken diğeri de artar) anlamına geldiği açıklanır."
+    },
+    {
+        "id": 78,
+        "category": "Chapter 2 - Scope of Practice",
+        "question": "Müşterinin tıbbi bir durumu (Örn: Yüksek Tansiyon) olduğunda, CNC'nin beslenme programını hazırlarken atması gereken ilk yasal adım nedir?",
+        "options": [
+            "Tuzu tamamen kesen bir diyet yazmak",
+            "Müşterinin doktorundan yazılı izin/onay almak",
+            "Tansiyon ilacını bırakmasını önermek",
+            "Kendi tansiyon ölçümünü yapmasını istemek"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 2'de, tıbbi durumu olan müşterilerle çalışırken mutlaka doktorundan 'Medical Clearance' (Tıbbi Onay) alınması gerektiği vurgulanır."
+    },
+    {
+        "id": 79,
+        "category": "Chapter 4 - Food Preferences and Influences",
+        "question": "'Lezzet' (Flavor) algısı, teknik olarak hangi duyusal girdilerin beyinde birleşmesiyle oluşur?",
+        "options": [
+            "Sadece dil üzerindeki tat tomurcukları",
+            "Tat (Taste) ve Koku (Smell) duyularının kombinasyonu",
+            "Sadece yemeğin görsel sunumu",
+            "Yemeğin sıcaklığı ve dokusu"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 4'te, 'Flavor' (Lezzet) kavramının, dildeki tat (Taste) ve burundaki koku (Aroma/Smell) duyularının entegrasyonu olduğu belirtilir."
+    },
+    {
+        "id": 80,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Bilimsel bir araştırmada 'Bağımsız Değişken' (Independent Variable), deney sürecinde nasıl bir rol oynar?",
+        "options": [
+            "Araştırmacının manipüle ettiği veya değiştirdiği faktördür",
+            "Sonucun ölçüldüğü etkilenen faktördür",
+            "Deney dışı tutulan kontrol grubudur",
+            "Sabit tutulan çevresel koşullardır"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Chapter 3'te, deneylerde araştırmacının değiştirdiği ve etkisini gözlemlediği değişkene 'Independent Variable' (Bağımsız Değişken) dendiği tanımlanır."
+    },
+    {
+        "id": 81,
+        "category": "Chapter 1 - Introduction to Nutrition Coaching",
+        "question": "Bir koçun müşterisini 'Aktif Dinleme' (Active Listening) yöntemiyle dinlemesi, iletişimde hangi davranışı gerektirir?",
+        "options": [
+            "Müşteri konuşurken bir sonraki cevabı düşünmek",
+            "Müşterinin sözünü kesip kendi fikrini söylemek",
+            "Sözlü ve sözsüz tepkilerle tam dikkatini vermek",
+            "Müşteri konuşurken başka işlerle ilgilenmek"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: Chapter 1'de, aktif dinlemenin sadece duymak değil; göz teması, onaylayıcı jestler ve tam dikkat ile müşteriyi anlamaya çalışmak olduğu belirtilir."
+    },
+    {
+        "id": 82,
+        "category": "Chapter 2 - Scope of Practice",
+        "question": "Beslenme Koçunun (CNC), müşterisine 'Makro Besin' (Protein, Karbonhidrat, Yağ) hedefleri belirlemesi yasal mıdır?",
+        "options": [
+            "Hayır, bu tıbbi bir reçetedir",
+            "Evet, sağlıklı bireyler için rehberlik kapsamındadır",
+            "Sadece protein hedefi verebilir",
+            "Sadece yağ hedefi verebilir"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 2'de, CNC'nin sağlıklı popülasyona genel makro besin dağılımı ve rehberliği yapmasının 'Scope of Practice' dahilinde olduğu belirtilir."
+    },
+    {
+        "id": 83,
+        "category": "Chapter 4 - Food Preferences and Influences",
+        "question": "'Satiation' (Doygunluk) terimi, yeme davranışı sürecinde tam olarak hangi noktayı ifade eder?",
+        "options": [
+            "Yemekten saatler sonra acıkma hissini",
+            "Yemeğe başlama kararını",
+            "Öğün sırasında yeme işlemini sonlandıran hissi",
+            "Yemeğin lezzetinden alınan hazzı"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: Chapter 4'te, 'Satiation' öğün devam ederken oluşan ve yeme eylemini durduran (termination of eating) biyolojik sinyal olarak tanımlanır."
+    },
+    {
+        "id": 84,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Bilimsel toplulukta 'Konsensüs' (Consensus) oluşması, belirli bir konuda ne anlama gelir?",
+        "options": [
+            "Tüm bilim insanlarının %100 aynı fikirde olması",
+            "Konuyla ilgili kanıtların çoğunluğunun aynı sonucu göstermesi",
+            "Hiçbir karşıt görüşün bulunmaması",
+            "Konunun artık araştırılmaya değer görülmemesi"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 3'te, bilimsel konsensüsün herkesin hemfikir olması değil, kanıtların büyük çoğunluğunun (preponderance of evidence) belirli bir sonucu işaret etmesi olduğu açıklanır."
+    },
+    {
+        "id": 85,
+        "category": "Chapter 2 - Scope of Practice",
+        "question": "Müşterinin sigorta şirketine sunmak için 'Tıbbi Beslenme Tedavisi faturası' istemesi durumunda, CNC ne yapmalıdır?",
+        "options": [
+            "İstenen faturayı hemen düzenleyip vermelidir",
+            "Faturayı bir diyetisyen arkadaşına kestirmelidir",
+            "Bunu yapamayacağını, çünkü tıbbi hizmet sağlayıcısı olmadığını belirtmelidir",
+            "Ek ücret karşılığında faturayı yazmalıdır"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: Chapter 2'de, CNC'lerin sigorta şirketleri tarafından tanınan tıbbi hizmet sağlayıcıları olmadığı ve tıbbi fatura düzenleyemeyeceği açıkça belirtilir."
+    },
+    {
+        "id": 86,
+        "category": "Chapter 4 - Food Preferences and Influences",
+        "question": "Bir gıdanın 'Lezzetliliği' (Palatability) arttıkça, insan beynindeki ödül mekanizması üzerindeki etkisi nasıl değişir?",
+        "options": [
+            "Daha az dopamin salgılanır ve iştah kapanır",
+            "Ödül sistemi uyarılır ve tüketim isteği artar",
+            "Beyin bu gıdayı tehdit olarak algılar",
+            "Lezzet ile ödül sistemi arasında ilişki yoktur"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 4'te, yüksek 'Palatability'e sahip gıdaların beynin ödül sistemini (hedonik) tetiklediği ve biyolojik açlık olmasa bile yeme isteğini artırdığı anlatılır."
+    },
+    {
+        "id": 87,
+        "category": "Chapter 1 - Introduction to Nutrition Coaching",
+        "question": "Müşteri ile güven ilişkisi (Rapport) kurarken, koçun kaçınması gereken en temel iletişim hatası nedir?",
+        "options": [
+            "Göz teması kurmak",
+            "Müşteriyi yargılamak veya eleştirmek",
+            "Açık uçlu sorular sormak",
+            "Müşterinin ismini kullanmak"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 1'de, yargılayıcı (judgmental) tavrın güveni zedelediği, bunun yerine kabul edici ve destekleyici bir tutum sergilenmesi gerektiği belirtilir."
+    },
+    {
+        "id": 88,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Bir çalışmanın 'İç Geçerlilik' (Internal Validity) seviyesinin yüksek olması, neyi garanti eder?",
+        "options": [
+            "Sonucun sadece deney koşullarına bağlı olduğunu",
+            "Sonucun tüm evrene genellenebileceğini",
+            "Deneyin çok ucuza mal edildiğini",
+            "Deneyin çok kısa sürdüğünü"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Chapter 3'te, İç Geçerlilik (Internal Validity), sonucun dış etkenlerden ziyade, doğrudan bağımsız değişkenin etkisiyle oluştuğuna duyulan güveni ifade eder."
+    },
+    {
+        "id": 89,
+        "category": "Chapter 2 - Scope of Practice",
+        "question": "Aşağıdaki profesyonellerden hangisi, müşteriye 'Özel Diyet Planı' (Meal Plan) yazma konusunda tam yasal yetkiye sahiptir?",
+        "options": [
+            "Sertifikalı Beslenme Koçu (CNC)",
+            "Kayıtlı Diyetisyen (RD/RDN)",
+            "Kişisel Spor Eğitmeni (CPT)",
+            "Grup Egzersiz Eğitmeni (GEI)"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 2'de, kişiye özel tıbbi veya spesifik diyet planı (meal plan) yazma yetkisinin yasal olarak Kayıtlı Diyetisyenlere (RD/RDN) ait olduğu belirtilir."
+    },
+    {
+        "id": 90,
+        "category": "Chapter 4 - Food Preferences and Influences",
+        "question": "Beslenme psikolojisinde, bireyin tok olmasına rağmen tatlı görünce yeme isteği duyması hangi açlık türüne örnektir?",
+        "options": [
+            "Metabolik Açlık",
+            "Homeostatik Açlık",
+            "Hedonik Açlık",
+            "Hücresel Açlık"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: Chapter 4'te, enerji ihtiyacı (Homeostatik) dışında, sadece zevk ve arzu (pleasure/desire) nedeniyle oluşan açlık 'Hedonic Hunger' olarak tanımlanır."
+    },
+    {
+        "id": 91,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Bir makalede 'Referanslar' (Kaynakça) listesinin bulunması, okuyucuya çalışmayla ilgili hangi güvenceyi sağlar?",
+        "options": [
+            "Yazarın popüler bir kişi olduğunu",
+            "Çalışmanın önceki bilimsel literatüre dayandığını",
+            "Makalenin en az 100 sayfa olduğunu",
+            "Çalışmanın sponsorsuz yapıldığını"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 3'te, kaynakça kullanımının, çalışmanın mevcut bilimsel bilgi birikimi üzerine inşa edildiğini ve iddiaların desteklendiğini gösterdiği belirtilir."
+    },
+    {
+        "id": 92,
+        "category": "Chapter 2 - Scope of Practice",
+        "question": "Bir Beslenme Koçunun, müşterisinin psikolojik sorunları nedeniyle ilerleyemediğini fark ettiğinde yapması gereken en doğru hareket nedir?",
+        "options": [
+            "Kendi hayat tecrübelerinden tavsiye vermek",
+            "Psikoloji kitapları okuyup terapi denemek",
+            "Yetki sınırını aştığını kabul edip uzmanına yönlendirmek",
+            "Sorunu görmezden gelip diyete odaklanmak"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: Chapter 2'deki sevk (referral) ilkelerine göre, psikolojik sorunlar CNC'nin yetki alanı dışındadır ve mutlaka bir ruh sağlığı uzmanına yönlendirilmelidir."
+    },
+    {
+        "id": 93,
+        "category": "Chapter 4 - Food Preferences and Influences",
+        "question": "Sosyo-ekonomik durumu düşük olan bireylerin beslenme tercihlerinde 'Maliyet' (Cost) faktörü nasıl bir rol oynar?",
+        "options": [
+            "Maliyet önemsizdir, sadece lezzete bakarlar",
+            "Sağlıklı gıdaya erişimde en büyük engeldir",
+            "Sadece organik ürünleri tercih ederler",
+            "Daha pahalı ürünleri statü için alırlar"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 4'te (ve kaynakça), gıda fiyatlarının, özellikle düşük gelirli gruplar için sağlıklı beslenmenin önündeki en büyük bariyer (barrier) olduğu vurgulanır."
+    },
+    {
+        "id": 94,
+        "category": "Chapter 1 - Introduction to Nutrition Coaching",
+        "question": "NASM'a göre, bir beslenme koçunun başarısı öncelikle müşterisinin hangi sonucu elde etmesiyle ölçülür?",
+        "options": [
+            "Koçun istediği kiloya inmesi",
+            "Uzun vadeli davranış değişikliği ve sürdürülebilirlik",
+            "En kısa sürede en çok kası yapması",
+            "Sadece takviye gıdalarla beslenmesi"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 1'de, başarının anlık sonuçlardan ziyade, müşterinin yaşam boyu sürdürebileceği sağlıklı alışkanlıklar ve davranış değişikliği kazanması olduğu belirtilir."
+    },
+    {
+        "id": 95,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Bilimsel araştırmalarda 'Gözlemci Yanlılığı' (Observer Bias) riskini ortadan kaldırmak için araştırmacılar hangi yöntemi kullanır?",
+        "options": [
+            "Verileri toplarken kendi beklentilerini gizlemek (Körleme)",
+            "Sonuçları katılımcılara sormak",
+            "Sadece olumlu sonuçları kaydetmek",
+            "Deneyi yarıda kesmek"
+        ],
+        "correct": 0,
+        "explanation": "ANALİZ: Chapter 3'te, araştırmacının beklentilerinin ölçümü etkilememesi için, kimin hangi grupta olduğunu bilmediği 'Blinding' (Körleme) yöntemi önerilir."
+    },
+    {
+        "id": 96,
+        "category": "Chapter 2 - Scope of Practice",
+        "question": "Bir müşteri, koçtan 'Kan Tahlili Sonuçlarını' yorumlamasını istediğinde, yasal ve etik cevap ne olmalıdır?",
+        "options": [
+            "Hemen değerlere bakıp teşhis koymak",
+            "Bunu sadece doktorunun yapabileceğini söylemek",
+            "İnternetten referans aralıklarına bakıp yorumlamak",
+            "Kendi kan değerleriyle kıyaslamak"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 2'de, laboratuvar sonuçlarını yorumlamanın ve teşhis koymanın (diagnosis) tıbbi bir eylem olduğu ve CNC'nin yetki sınırlarını aştığı açıkça belirtilir."
+    },
+    {
+        "id": 97,
+        "category": "Chapter 4 - Food Preferences and Influences",
+        "question": "'Duyu' (Sensory) verileri açısından, bir yemeğin 'Görsel Sunumu' (Visual) tüketici üzerinde nasıl bir etki yaratır?",
+        "options": [
+            "Görsellik lezzet algısını hiç etkilemez",
+            "Beklenti oluşturarak tat algısını ve iştahı etkiler",
+            "Sadece yemeğin fiyatını belirler",
+            "Midenin sindirim hızını yavaşlatır"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 4'te, 'Gözle yemek' (eating with eyes) deyimine atıfla, görsel sunumun beklenti yarattığı ve lezzet algısını (perception) doğrudan etkilediği anlatılır."
+    },
+    {
+        "id": 98,
+        "category": "Chapter 1 - Introduction to Nutrition Coaching",
+        "question": "Bir Beslenme Koçu, müşterisine bilgi aktarırken karmaşık bilimsel terimler yerine nasıl bir dil kullanmalıdır?",
+        "options": [
+            "Sadece Latince tıbbi terimler",
+            "Anlaşılması zor akademik bir dil",
+            "Basit, anlaşılır ve müşteri seviyesine uygun bir dil",
+            "Sokak ağzı ve kaba bir dil"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: Chapter 1'de, etkili iletişim için koçun 'Jargon'dan kaçınması ve bilgiyi müşterinin anlayabileceği basitlikte (clear and simple) sunması gerektiği vurgulanır."
+    },
+    {
+        "id": 99,
+        "category": "Chapter 3 - Evidence-Based Nutrition",
+        "question": "Bilimsel bir çalışmanın, sadece belirli bir coğrafyadaki insanları kapsayıp diğerlerini kapsamaması hangi geçerlilik sorununu doğurur?",
+        "options": [
+            "İç Geçerlilik (Internal Validity) Sorunu",
+            "Dış Geçerlilik (External Validity / Generalizability) Sorunu",
+            "Güvenilirlik (Reliability) Sorunu",
+            "Etik (Ethics) Sorunu"
+        ],
+        "correct": 1,
+        "explanation": "ANALİZ: Chapter 3'te, örneklem grubunun darlığının, sonuçların diğer gruplara genellenmesini (External Validity) zorlaştırdığı belirtilir."
+    },
+    {
+        "id": 100,
+        "category": "Chapter 2 - Scope of Practice",
+        "question": "Sonuç olarak, NASM CNC sertifikasına sahip bir koçun temel mesleki sınırı (Scope of Practice) aşağıdakilerden hangisidir?",
+        "options": [
+            "Hastalıkları beslenme ile tedavi etmek",
+            "Tıbbi beslenme reçeteleri yazmak",
+            "Sağlıklı bireylere beslenme eğitimi ve davranış rehberliği sunmak",
+            "Yeme bozukluklarını terapi ile iyileştirmek"
+        ],
+        "correct": 2,
+        "explanation": "ANALİZ: Chapter 2'nin genel özeti olarak; CNC hastalık tedavi edemez, reçete yazamaz; sadece sağlıklı bireylere eğitim, rehberlik ve koçluk (guidance/coaching) yapabilir."
+    }]; 
+    // ==============================================================
+
+    let currentQuestionIndex = 0;
+    let userAnswers = [];
+    let userUnsure = []; // Emin değilim durumlarını tutar
+    let timeLeft = 90 * 60; 
+    let timerInterval;
+    let isExamFinished = false;
+    let isReviewMode = false;
+    let reviewIndices = []; // İnceleme modunda gösterilecek soru indeksleri
+    let reviewIndex = 0; 
+
+    window.onload = function() {
+        if(examQuestions.length === 0) {
+            document.getElementById('question-text').innerText = "Lütfen soru verilerini koda ekleyin!";
+            return;
+        }
+        userAnswers = new Array(examQuestions.length).fill(null);
+        userUnsure = new Array(examQuestions.length).fill(false);
+        updateUI(); 
+        startTimer(); 
+    };
+
+    function startTimer() {
+        timerInterval = setInterval(() => {
+            if (timeLeft <= 0) { finishExam(); return; }
+            timeLeft--;
+            let m = Math.floor(timeLeft / 60);
+            let s = timeLeft % 60;
+            document.getElementById('timer').innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
+            if(timeLeft < 300) document.getElementById('timer').style.color = '#e74c3c';
+        }, 1000);
+    }
+
+    function toggleUnsure() {
+        if (isExamFinished || isReviewMode) return;
+        let qIndex = currentQuestionIndex;
+        userUnsure[qIndex] = !userUnsure[qIndex];
+        updateUnsureUI();
+    }
+
+    function updateUnsureUI() {
+        const btn = document.getElementById('unsure-btn');
+        let qIndex = isReviewMode ? reviewIndices[reviewIndex] : currentQuestionIndex;
+        
+        if (userUnsure[qIndex]) btn.classList.add('active');
+        else btn.classList.remove('active');
+    }
+
+    function updateUI() {
+        let qIndex = isReviewMode ? reviewIndices[reviewIndex] : currentQuestionIndex;
+        let qData = examQuestions[qIndex];
+        
+        // Başlık ve Mod Ayarları
+        if (isReviewMode) {
+            document.getElementById('q-number').innerText = `İnceleme ${reviewIndex + 1} / ${reviewIndices.length}`;
+            document.getElementById('review-badge').style.display = 'inline-block';
+            document.getElementById('timer').style.visibility = 'hidden';
+            
+            // Neden İncelemede? (Yanlış mı yaptı yoksa Emin mi değildi?)
+            const reasonBadge = document.getElementById('review-reason-badge');
+            reasonBadge.style.display = 'inline-block';
+            
+            const isCorrect = userAnswers[qIndex] === qData.correct;
+            const isUnsure = userUnsure[qIndex];
+
+            if (!isCorrect) {
+                reasonBadge.innerText = "DURUM: YANLIŞ CEVAP";
+                reasonBadge.style.background = "#f8d7da";
+                reasonBadge.style.color = "#721c24";
+            } else if (isCorrect && isUnsure) {
+                reasonBadge.innerText = "DURUM: DOĞRU AMA EMİN DEĞİLSİN";
+                reasonBadge.style.background = "#e8daef"; // Morumsu
+                reasonBadge.style.color = "#6c3483";
+            }
+
+            // İnceleme modunda "Emin değilim" butonu tıklanamaz ama durumu gösterir
+            document.getElementById('unsure-btn').style.pointerEvents = 'none';
+            document.getElementById('unsure-btn').style.opacity = '0.7';
+
+        } else {
+            document.getElementById('q-number').innerText = `Soru ${currentQuestionIndex + 1} / ${examQuestions.length}`;
+            document.getElementById('review-reason-badge').style.display = 'none';
+            document.getElementById('unsure-btn').style.pointerEvents = 'auto';
+            document.getElementById('unsure-btn').style.opacity = '1';
+        }
+
+        // Progress Bar
+        let total = isReviewMode ? reviewIndices.length : examQuestions.length;
+        let current = isReviewMode ? reviewIndex : currentQuestionIndex;
+        document.getElementById('progress-bar').style.width = `${((current + 1) / total) * 100}%`;
+
+        // Soru Metni
+        document.getElementById('question-text').innerText = qData.question;
+        const container = document.getElementById('options-container');
+        container.innerHTML = '';
+        
+        // Açıklama Kutusu
+        const expBox = document.getElementById('explanation-box');
+        expBox.style.display = 'none';
+        
+        // Şıklar
+        qData.options.forEach((opt, index) => {
+            const btn = document.createElement('div');
+            btn.className = 'option-btn';
+            btn.innerText = opt;
+            
+            if (isReviewMode) {
+                btn.style.cursor = 'default';
+                if (index === qData.correct) btn.classList.add('correct'); // Doğruyu Yeşil Yap
+                else if (index === userAnswers[qIndex]) btn.classList.add('wrong'); // Yanlışı Kırmızı Yap
+            } else {
+                if (userAnswers[currentQuestionIndex] === index) btn.classList.add('selected');
+                btn.onclick = () => selectOption(index);
+            }
+            container.appendChild(btn);
+        });
+
+        // Emin Değilim Butonunu Güncelle
+        updateUnsureUI();
+
+        // Açıklama Göster (Sadece İnceleme Modunda)
+        if (isReviewMode) {
+            expBox.style.display = 'block';
+            expBox.innerHTML = `<strong>ANALİZ:</strong><br>${qData.explanation || 'Açıklama mevcut değil.'}`;
+        }
+
+        // Navigasyon Butonları
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const finishBtn = document.getElementById('finish-btn');
+
+        if (isReviewMode) {
+            prevBtn.disabled = reviewIndex === 0;
+            prevBtn.onclick = prevReviewQuestion;
+            
+            if (reviewIndex === reviewIndices.length - 1) {
+                nextBtn.innerText = "Sonuçlara Dön";
+                nextBtn.onclick = returnToResults;
+            } else {
+                nextBtn.innerText = "Sonraki →";
+                nextBtn.onclick = nextReviewQuestion;
+            }
+            finishBtn.style.display = 'none';
+            nextBtn.style.display = 'block';
+        } else {
+            prevBtn.disabled = currentQuestionIndex === 0;
+            prevBtn.onclick = prevQuestion;
+            nextBtn.innerText = "İleri →";
+            nextBtn.onclick = nextQuestion;
+
+            if (currentQuestionIndex === examQuestions.length - 1) {
+                nextBtn.style.display = 'none';
+                finishBtn.style.display = 'block';
+            } else {
+                nextBtn.style.display = 'block';
+                finishBtn.style.display = 'none';
+            }
+        }
+    }
+
+    function selectOption(index) {
+        if (isExamFinished || isReviewMode) return;
+        userAnswers[currentQuestionIndex] = index;
+        updateUI();
+    }
+
+    function nextQuestion() {
+        if (currentQuestionIndex < examQuestions.length - 1) { currentQuestionIndex++; updateUI(); }
+    }
+    function prevQuestion() {
+        if (currentQuestionIndex > 0) { currentQuestionIndex--; updateUI(); }
+    }
+    function nextReviewQuestion() {
+        if (reviewIndex < reviewIndices.length - 1) { reviewIndex++; updateUI(); }
+    }
+    function prevReviewQuestion() {
+        if (reviewIndex > 0) { reviewIndex--; updateUI(); }
+    }
+
+    function finishExam() {
+        clearInterval(timerInterval);
+        isExamFinished = true;
+        let correctCount = 0;
+        let unsureCount = 0;
+        reviewIndices = [];
+
+        examQuestions.forEach((q, index) => {
+            const isCorrect = userAnswers[index] === q.correct;
+            const isUnsure = userUnsure[index];
+
+            if (isCorrect) correctCount++;
+            if (isUnsure) unsureCount++;
+
+            // İnceleme listesine ekleme mantığı:
+            // 1. Yanlış cevaplar
+            // 2. Doğru ama "Emin Değilim" denilen cevaplar
+            if (!isCorrect || (isCorrect && isUnsure)) {
+                reviewIndices.push(index);
+            }
+        });
+
+        const score = Math.round((correctCount / examQuestions.length) * 100);
+        document.getElementById('main-container').style.display = 'none';
+        document.getElementById('result-screen').style.display = 'block';
+        
+        const scoreCircle = document.getElementById('final-score');
+        scoreCircle.innerText = `%${score}`;
+        scoreCircle.style.borderColor = score >= 70 ? '#27ae60' : '#c0392b';
+        scoreCircle.style.color = score >= 70 ? '#27ae60' : '#c0392b';
+
+        const reviewBtn = document.getElementById('start-review-btn');
+        const msg = document.getElementById('result-msg');
+        const unsureMsg = document.getElementById('unsure-count-msg');
+        
+        if (score >= 85) msg.innerText = "Mükemmel! Gerçek sınava hazırsınız.";
+        else if (score >= 70) msg.innerText = "Tebrikler, geçtiniz. Ancak %85 üzeri için biraz daha tekrar gerekli.";
+        else msg.innerText = "Henüz hazır değilsiniz. Yanlışları analiz edip tekrar deneyin.";
+
+        unsureMsg.innerText = `${unsureCount} soruda emin değildiniz.`;
+
+        if (reviewIndices.length === 0) {
+            reviewBtn.style.display = 'none';
+            unsureMsg.innerText += " İnceleyecek soru yok, hepsi emin ve doğru!";
+        } else {
+            reviewBtn.style.display = 'inline-block';
+            reviewBtn.innerText = `${reviewIndices.length} Soruyu İncele (Yanlış + Şüpheli)`;
+        }
+    }
+
+    function startReviewMode() {
+        isReviewMode = true;
+        reviewIndex = 0;
+        document.getElementById('result-screen').style.display = 'none';
+        document.getElementById('main-container').style.display = 'flex';
+        updateUI();
+    }
+    function returnToResults() {
+        document.getElementById('main-container').style.display = 'none';
+        document.getElementById('result-screen').style.display = 'block';
+    }
+</script>
+</body>
+</html>
